@@ -18,9 +18,10 @@ import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete
 import { RecipeLoadingSkeleton } from '@/components/cook/RecipeLoadingSkeleton';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CookingMode } from '@/components/cook/CookingMode';
 import { 
   ChefHat, Plus, X, Package, Clock, Sparkles, Loader2, Zap, 
-  ArrowLeft, Bookmark, ChevronRight, Heart, ImagePlus
+  ArrowLeft, Bookmark, ChevronRight, Heart, ImagePlus, Play, Images
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TIME_OPTIONS, type SavedRecipe, type PantryItem, type RecipeIngredient, type RecipeInstruction, type RecipeNutrition, type MonthlyGoal } from '@/types/database';
@@ -51,6 +52,8 @@ export default function Cook() {
   const [generatingStepImage, setGeneratingStepImage] = useState<number | null>(null);
   const [recipeImage, setRecipeImage] = useState<string | null>(null);
   const [generatingRecipeImage, setGeneratingRecipeImage] = useState(false);
+  const [generatingAllImages, setGeneratingAllImages] = useState(false);
+  const [cookingMode, setCookingMode] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -302,11 +305,52 @@ export default function Cook() {
     if (selectedRecipe) {
       setStepImages({});
       setRecipeImage(null);
+      setCookingMode(false);
     }
   }, [selectedRecipe?.title]);
 
+  // Generate all images at once
+  const generateAllImages = async (recipe: GeneratedRecipe) => {
+    setGeneratingAllImages(true);
+    
+    try {
+      // Generate main recipe image
+      if (!recipeImage) {
+        await generateRecipeMainImage(recipe);
+      }
+      
+      // Generate all step images in parallel (but limit concurrency to 3)
+      const steps = recipe.instructions.filter(step => !stepImages[step.step]);
+      const batchSize = 3;
+      
+      for (let i = 0; i < steps.length; i += batchSize) {
+        const batch = steps.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(step => generateStepImage(step, recipe))
+        );
+      }
+    } catch (error) {
+      console.error('Error generating all images:', error);
+    } finally {
+      setGeneratingAllImages(false);
+    }
+  };
+
   // Recipe Detail View
   if (selectedRecipe) {
+    // Show Cooking Mode if active
+    if (cookingMode) {
+      return (
+        <CookingMode
+          recipe={selectedRecipe}
+          stepImages={stepImages}
+          onGenerateStepImage={(step) => generateStepImage(step, selectedRecipe)}
+          generatingStepImage={generatingStepImage}
+          onClose={() => setCookingMode(false)}
+        />
+      );
+    }
+
     return (
       <MobileLayout showNav={false}>
         <div className="min-h-screen">
@@ -446,6 +490,48 @@ export default function Cook() {
               </CardContent>
             </Card>
 
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="default"
+                size="lg"
+                onClick={() => setCookingMode(true)}
+                className="col-span-2"
+              >
+                <Play className="h-5 w-5 mr-2" />
+                Start Cooking Mode
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => generateAllImages(selectedRecipe)}
+                disabled={generatingAllImages || generatingRecipeImage || generatingStepImage !== null}
+              >
+                {generatingAllImages ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Images className="h-4 w-4 mr-2" />
+                    Generate All Images
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => saveRecipe(selectedRecipe)}
+                disabled={savingRecipe}
+              >
+                {savingRecipe ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Bookmark className="h-4 w-4 mr-2" />
+                )}
+                Save Recipe
+              </Button>
+            </div>
+
             {/* Step-by-Step Instructions with Images */}
             <div className="space-y-3">
               <h3 className="text-lg font-semibold">Step-by-Step Instructions</h3>
@@ -464,8 +550,8 @@ export default function Cook() {
               </div>
             </div>
 
-            {/* Save Buttons */}
-            <div className="space-y-2">
+            {/* Save with Image Options */}
+            <div className="space-y-2 pt-4 border-t">
               <Button 
                 className="w-full" 
                 size="lg"
@@ -478,16 +564,6 @@ export default function Cook() {
                   <ImagePlus className="h-4 w-4 mr-2" />
                 )}
                 Save with AI Image
-              </Button>
-              <Button 
-                variant="outline"
-                className="w-full" 
-                size="lg"
-                onClick={() => saveRecipe(selectedRecipe, false)}
-                disabled={savingRecipe}
-              >
-                <Bookmark className="h-4 w-4 mr-2" />
-                Save without Image
               </Button>
             </div>
           </div>
