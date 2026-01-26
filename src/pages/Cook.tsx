@@ -352,24 +352,27 @@ export default function Cook() {
     }
   };
 
-  // Auto-generate all images when selecting a new recipe
+  // Auto-generate step images when selecting a new recipe
   useEffect(() => {
     if (selectedRecipe) {
       setStepImages({});
-      setRecipeImage(null);
       setCookingMode(false);
       
-      // Auto-generate all images
-      generateAllImagesAuto(selectedRecipe);
+      // Use existing image if available, otherwise generate
+      if (selectedRecipe.image_url) {
+        setRecipeImage(selectedRecipe.image_url);
+      } else {
+        setRecipeImage(null);
+        generateRecipeMainImage(selectedRecipe);
+      }
+      
+      // Auto-generate all step images
+      generateStepImagesAuto(selectedRecipe);
     }
   }, [selectedRecipe?.title]);
 
-  // Generate all images automatically (without setting global loading state)
-  const generateAllImagesAuto = async (recipe: GeneratedRecipe) => {
-    // Generate main recipe image first
-    generateRecipeMainImage(recipe);
-    
-    // Generate step images in batches of 2 for speed
+  // Generate step images automatically in batches
+  const generateStepImagesAuto = async (recipe: GeneratedRecipe) => {
     const steps = recipe.instructions;
     const batchSize = 2;
     
