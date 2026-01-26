@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Comprehensive ingredient database with categories
@@ -76,6 +76,7 @@ interface IngredientAutocompleteProps {
   existingIngredients: string[];
   placeholder?: string;
   className?: string;
+  isLoading?: boolean;
 }
 
 export function IngredientAutocomplete({
@@ -84,7 +85,8 @@ export function IngredientAutocomplete({
   onAddIngredient,
   existingIngredients,
   placeholder = "Type an ingredient...",
-  className
+  className,
+  isLoading = false
 }: IngredientAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -244,9 +246,9 @@ export function IngredientAutocomplete({
             onChange('');
           }
         }} 
-        disabled={!value.trim()}
+        disabled={!value.trim() || isLoading}
       >
-        <Plus className="h-4 w-4" />
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
       </Button>
     </div>
   );

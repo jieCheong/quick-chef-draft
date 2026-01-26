@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, X, Package, Search, Loader2 } from 'lucide-react';
+import { X, Package, Search, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { INGREDIENT_CATEGORIES, type PantryItem, type IngredientCategory } from '@/types/database';
 
@@ -157,22 +158,14 @@ export default function Pantry() {
             <CardTitle className="text-base">Add Ingredient</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Ingredient name..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="flex-1"
-              />
-              <Button 
-                size="icon" 
-                onClick={() => addItem(inputValue)} 
-                disabled={!inputValue.trim() || isAdding}
-              >
-                {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              </Button>
-            </div>
+            <IngredientAutocomplete
+              value={inputValue}
+              onChange={setInputValue}
+              onAddIngredient={(ingredient) => addItem(ingredient)}
+              existingIngredients={items.map(i => i.name.toLowerCase())}
+              placeholder="Type an ingredient..."
+              isLoading={isAdding}
+            />
 
             {/* Category Selector */}
             <div className="flex flex-wrap gap-1.5">
