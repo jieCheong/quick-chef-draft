@@ -110,31 +110,51 @@ export default function Cook() {
     setRetryCount(retry);
 
     try {
-      const { data, error } = await supabase.functions.invoke('generate-recipes', {
-        body: {
-          ingredients,
-          maxTime: quickMealsOnly ? 15 : selectedTime,
-          dietaryStyle: profile?.dietary_style,
-          allergies: profile?.allergies,
-          skillLevel: profile?.skill_level,
-          cuisines: profile?.preferred_cuisines,
-          goals: profile?.monthly_goals,
-          craving: craving.trim() || undefined,
-        },
-      });
+      // Use fetch with longer timeout instead of supabase.functions.invoke
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-      if (error) throw error;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-recipes`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            ingredients,
+            maxTime: quickMealsOnly ? 15 : selectedTime,
+            dietaryStyle: profile?.dietary_style,
+            allergies: profile?.allergies,
+            skillLevel: profile?.skill_level,
+            cuisines: profile?.preferred_cuisines,
+            goals: profile?.monthly_goals,
+            craving: craving.trim() || undefined,
+          }),
+          signal: controller.signal,
+        }
+      );
 
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+
+      const data = await response.json();
       setGeneratedRecipes(data.recipes);
       setRetryCount(0);
-    } catch (error) {
+      setIsGenerating(false);
+    } catch (error: any) {
       console.error('Error generating recipes:', error);
       
       // Auto-retry with exponential backoff (max 2 retries)
-      if (retry < 2) {
+      if (retry < 2 && error?.name !== 'AbortError') {
         const delay = Math.pow(2, retry) * 1000; // 1s, 2s
         toast({
-          description: `Retrying in ${delay / 1000}s...`,
+          description: `Connection slow, retrying...`,
         });
         setTimeout(() => generateRecipes(retry + 1), delay);
         return;
@@ -143,13 +163,12 @@ export default function Cook() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to generate recipes. Please try again.',
+        description: error?.name === 'AbortError' 
+          ? 'Request timed out. Please try again.'
+          : 'Failed to generate recipes. Please try again.',
       });
       setRetryCount(0);
-    } finally {
-      if (retry >= 2 || !isGenerating) {
-        setIsGenerating(false);
-      }
+      setIsGenerating(false);
     }
   };
 
