@@ -21,7 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CookingMode } from '@/components/cook/CookingMode';
 import { 
   ChefHat, Plus, X, Package, Clock, Sparkles, Loader2, Zap, 
-  ArrowLeft, Bookmark, ChevronRight, Heart, ImagePlus, Play, Images
+  ArrowLeft, Bookmark, ChevronRight, Heart, ImagePlus, Play
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TIME_OPTIONS, type SavedRecipe, type PantryItem, type RecipeIngredient, type RecipeInstruction, type RecipeNutrition, type MonthlyGoal } from '@/types/database';
@@ -52,7 +52,6 @@ export default function Cook() {
   const [generatingStepImage, setGeneratingStepImage] = useState<number | null>(null);
   const [recipeImage, setRecipeImage] = useState<string | null>(null);
   const [generatingRecipeImage, setGeneratingRecipeImage] = useState(false);
-  const [generatingAllImages, setGeneratingAllImages] = useState(false);
   const [cookingMode, setCookingMode] = useState(false);
 
   useEffect(() => {
@@ -300,39 +299,32 @@ export default function Cook() {
     }
   };
 
-  // Reset images when selecting a new recipe
+  // Auto-generate all images when selecting a new recipe
   useEffect(() => {
     if (selectedRecipe) {
       setStepImages({});
       setRecipeImage(null);
       setCookingMode(false);
+      
+      // Auto-generate all images
+      generateAllImagesAuto(selectedRecipe);
     }
   }, [selectedRecipe?.title]);
 
-  // Generate all images at once
-  const generateAllImages = async (recipe: GeneratedRecipe) => {
-    setGeneratingAllImages(true);
+  // Generate all images automatically (without setting global loading state)
+  const generateAllImagesAuto = async (recipe: GeneratedRecipe) => {
+    // Generate main recipe image first
+    generateRecipeMainImage(recipe);
     
-    try {
-      // Generate main recipe image
-      if (!recipeImage) {
-        await generateRecipeMainImage(recipe);
-      }
-      
-      // Generate all step images in parallel (but limit concurrency to 3)
-      const steps = recipe.instructions.filter(step => !stepImages[step.step]);
-      const batchSize = 3;
-      
-      for (let i = 0; i < steps.length; i += batchSize) {
-        const batch = steps.slice(i, i + batchSize);
-        await Promise.all(
-          batch.map(step => generateStepImage(step, recipe))
-        );
-      }
-    } catch (error) {
-      console.error('Error generating all images:', error);
-    } finally {
-      setGeneratingAllImages(false);
+    // Generate step images in batches of 2 for speed
+    const steps = recipe.instructions;
+    const batchSize = 2;
+    
+    for (let i = 0; i < steps.length; i += batchSize) {
+      const batch = steps.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(step => generateStepImage(step, recipe))
+      );
     }
   };
 
@@ -503,25 +495,9 @@ export default function Cook() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => generateAllImages(selectedRecipe)}
-                disabled={generatingAllImages || generatingRecipeImage || generatingStepImage !== null}
-              >
-                {generatingAllImages ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Images className="h-4 w-4 mr-2" />
-                    Generate All Images
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
                 onClick={() => saveRecipe(selectedRecipe)}
                 disabled={savingRecipe}
+                className="col-span-2"
               >
                 {savingRecipe ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
