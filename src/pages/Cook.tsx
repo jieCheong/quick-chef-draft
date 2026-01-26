@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useRecipeImage } from '@/hooks/useRecipeImage';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,11 +14,12 @@ import { QuickBadge } from '@/components/ui/quick-badge';
 import { GoalBadge } from '@/components/ui/goal-badge';
 import { RecipeCard } from '@/components/recipe/RecipeCard';
 import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
+import { RecipeLoadingSkeleton } from '@/components/cook/RecipeLoadingSkeleton';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   ChefHat, Plus, X, Package, Clock, Sparkles, Loader2, Zap, 
-  ArrowLeft, Bookmark, ChevronRight, Heart
+  ArrowLeft, Bookmark, ChevronRight, Heart, ImagePlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TIME_OPTIONS, type SavedRecipe, type PantryItem, type RecipeIngredient, type RecipeInstruction, type RecipeNutrition, type MonthlyGoal } from '@/types/database';
@@ -30,6 +32,7 @@ export default function Cook() {
   const { user, loading: authLoading } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
+  const { generateImage, isGenerating: isGeneratingImage } = useRecipeImage();
 
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -40,6 +43,7 @@ export default function Cook() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedRecipes, setGeneratedRecipes] = useState<GeneratedRecipe[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<GeneratedRecipe | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [craving, setCraving] = useState('');
 
@@ -92,7 +96,7 @@ export default function Cook() {
     });
   };
 
-  const generateRecipes = async () => {
+  const generateRecipes = async (retry = 0) => {
     if (ingredients.length === 0) {
       toast({
         variant: 'destructive',
@@ -103,6 +107,7 @@ export default function Cook() {
 
     setIsGenerating(true);
     setGeneratedRecipes([]);
+    setRetryCount(retry);
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-recipes', {
@@ -121,24 +126,39 @@ export default function Cook() {
       if (error) throw error;
 
       setGeneratedRecipes(data.recipes);
+      setRetryCount(0);
     } catch (error) {
       console.error('Error generating recipes:', error);
+      
+      // Auto-retry with exponential backoff (max 2 retries)
+      if (retry < 2) {
+        const delay = Math.pow(2, retry) * 1000; // 1s, 2s
+        toast({
+          description: `Retrying in ${delay / 1000}s...`,
+        });
+        setTimeout(() => generateRecipes(retry + 1), delay);
+        return;
+      }
+      
       toast({
         variant: 'destructive',
         title: 'Error',
         description: 'Failed to generate recipes. Please try again.',
       });
+      setRetryCount(0);
     } finally {
-      setIsGenerating(false);
+      if (retry >= 2 || !isGenerating) {
+        setIsGenerating(false);
+      }
     }
   };
 
-  const saveRecipe = async (recipe: GeneratedRecipe) => {
+  const saveRecipe = async (recipe: GeneratedRecipe, withImage = false) => {
     if (!user) return;
 
     setSavingRecipe(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('saved_recipes')
         .insert({
           user_id: user.id,
@@ -153,14 +173,26 @@ export default function Cook() {
           nutrition: recipe.nutrition as any,
           cuisines: recipe.cuisines,
           goal_alignment: recipe.goal_alignment,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
       toast({
         title: 'Recipe saved!',
-        description: 'You can find it in your saved recipes.',
+        description: withImage ? 'Generating image...' : 'You can find it in your saved recipes.',
       });
+
+      // Generate image in the background if requested
+      if (withImage && data) {
+        generateImage(
+          data.id,
+          recipe.title,
+          recipe.description || undefined,
+          recipe.ingredients
+        );
+      }
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -303,21 +335,46 @@ export default function Cook() {
               </CardContent>
             </Card>
 
-            {/* Save Button */}
-            <Button 
-              className="w-full" 
-              size="lg"
-              onClick={() => saveRecipe(selectedRecipe)}
-              disabled={savingRecipe}
-            >
-              {savingRecipe ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
+            {/* Save Buttons */}
+            <div className="space-y-2">
+              <Button 
+                className="w-full" 
+                size="lg"
+                onClick={() => saveRecipe(selectedRecipe, true)}
+                disabled={savingRecipe}
+              >
+                {savingRecipe ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <ImagePlus className="h-4 w-4 mr-2" />
+                )}
+                Save with AI Image
+              </Button>
+              <Button 
+                variant="outline"
+                className="w-full" 
+                size="lg"
+                onClick={() => saveRecipe(selectedRecipe, false)}
+                disabled={savingRecipe}
+              >
                 <Bookmark className="h-4 w-4 mr-2" />
-              )}
-              Save to Favorites
-            </Button>
+                Save without Image
+              </Button>
+            </div>
           </div>
+        </div>
+      </MobileLayout>
+    );
+  }
+
+  // Loading View
+  if (isGenerating) {
+    return (
+      <MobileLayout>
+        <div className="p-4">
+          <RecipeLoadingSkeleton 
+            message={retryCount > 0 ? `Retrying (attempt ${retryCount + 1})...` : "Creating delicious recipes..."} 
+          />
         </div>
       </MobileLayout>
     );
@@ -354,7 +411,7 @@ export default function Cook() {
           <Button 
             variant="outline" 
             className="w-full"
-            onClick={generateRecipes}
+            onClick={() => generateRecipes()}
           >
             <Sparkles className="h-4 w-4 mr-2" />
             Generate More Recipes
@@ -475,7 +532,7 @@ export default function Cook() {
         <Button 
           className="w-full" 
           size="lg"
-          onClick={generateRecipes}
+          onClick={() => generateRecipes()}
           disabled={ingredients.length === 0 || isGenerating}
         >
           {isGenerating ? (
