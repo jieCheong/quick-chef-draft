@@ -13,6 +13,7 @@ interface RecipeRequest {
   skillLevel?: string;
   cuisines?: string[];
   goals?: string[];
+  craving?: string;
 }
 
 serve(async (req) => {
@@ -21,25 +22,37 @@ serve(async (req) => {
   }
 
   try {
-    const { ingredients, maxTime, dietaryStyle, allergies, skillLevel, cuisines, goals }: RecipeRequest = await req.json();
+    const { ingredients, maxTime, dietaryStyle, allergies, skillLevel, cuisines, goals, craving }: RecipeRequest = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const systemPrompt = `You are a professional chef and nutritionist. Generate creative, delicious recipes based on the user's available ingredients and preferences.
+    const systemPrompt = `You are a creative, resourceful chef and nutritionist. Generate delicious recipes based on the user's available ingredients and preferences.
 
 IMPORTANT RULES:
-- Only use the ingredients provided (you can assume basic pantry staples like salt, pepper, oil)
-- Respect dietary restrictions and allergies
+- Primarily use the ingredients provided, but you CAN suggest creative substitutions
+- If the user is craving something specific (like pizza), get creative with available ingredients to make something similar
+- For example: no pizza dough? Use tortilla, naan, or bread as a base for "pizza-style" dishes
+- No pasta? Rice noodles or zucchini noodles work. No rice? Cauliflower rice or quinoa
+- Be creative and resourceful - home cooks often need to improvise!
+- Respect dietary restrictions and allergies absolutely (no substitutions that violate these)
 - Match recipes to the user's skill level
 - If goals are provided, prioritize recipes that support those nutritional goals
 - Be accurate with nutrition estimates
+- When suggesting substitutions, note them clearly in the recipe
+
+SUBSTITUTION PHILOSOPHY:
+- Think like a resourceful home cook
+- Common substitutions: tortilla for pizza dough, Greek yogurt for sour cream, cauliflower for rice/potatoes
+- Bread can become pizza base, croutons, breadcrumbs, or French toast
+- Eggs can bind, leaven, or be the star protein
+- Be creative but practical
 
 For each recipe, provide:
-- A creative, appetizing title
-- Brief description
+- A creative, appetizing title (can reference what it's inspired by, e.g., "Tortilla Pizza Margherita")
+- Brief description mentioning any clever substitutions used
 - Accurate cooking time
 - Difficulty level (easy, medium, hard)
 - Servings (default 2-4)
@@ -47,15 +60,21 @@ For each recipe, provide:
 - Step-by-step instructions
 - Nutrition estimates (calories, protein, carbs, fat, fiber)
 - Which monthly goals the recipe supports
+- Note any substitutions made
 
 OUTPUT FORMAT: Return a JSON object with a "recipes" array containing 2-3 recipe objects.`;
 
-    const userPrompt = `Generate 2-3 recipes using these ingredients: ${ingredients.join(", ")}
+    let userPrompt = `Generate 2-3 creative recipes using these ingredients: ${ingredients.join(", ")}`;
 
+    if (craving) {
+      userPrompt += `\n\nIMPORTANT: The user is craving: "${craving}". Try to create recipes that satisfy this craving using the available ingredients. Be creative with substitutions if needed!`;
+    }
+
+    userPrompt += `\n
 Constraints:
 - Maximum cooking time: ${maxTime} minutes
 ${dietaryStyle ? `- Dietary style: ${dietaryStyle}` : ""}
-${allergies?.length ? `- Must avoid: ${allergies.join(", ")}` : ""}
+${allergies?.length ? `- Must avoid (allergies): ${allergies.join(", ")}` : ""}
 ${skillLevel ? `- Skill level: ${skillLevel}` : ""}
 ${cuisines?.length ? `- Preferred cuisines: ${cuisines.join(", ")}` : ""}
 ${goals?.length ? `- Monthly goals to support: ${goals.join(", ")}` : ""}
