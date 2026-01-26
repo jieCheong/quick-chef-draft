@@ -170,24 +170,12 @@ export default function Budget() {
       });
 
       if (error) throw error;
-      
-      // Check if response contains an error message
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-      
       setRecommendations(data);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error getting recommendations:', error);
-      const errorMessage = error?.message || 'Failed to get recommendations';
       toast({
         variant: 'destructive',
-        title: 'AI Recommendations Error',
-        description: errorMessage.includes('credits') 
-          ? 'AI credits exhausted. Please add credits in Settings → Workspace → Usage.'
-          : errorMessage.includes('Rate limit')
-          ? 'Too many requests. Please try again in a minute.'
-          : 'Failed to get recommendations. Please try again.',
+        description: 'Failed to get recommendations',
       });
     } finally {
       setIsLoadingRecs(false);
