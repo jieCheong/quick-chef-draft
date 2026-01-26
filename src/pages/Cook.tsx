@@ -53,6 +53,8 @@ export default function Cook() {
   const [recipeImage, setRecipeImage] = useState<string | null>(null);
   const [generatingRecipeImage, setGeneratingRecipeImage] = useState(false);
   const [cookingMode, setCookingMode] = useState(false);
+  const [previewImages, setPreviewImages] = useState<Record<number, string>>({});
+  const [generatingPreviewImages, setGeneratingPreviewImages] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -154,6 +156,9 @@ export default function Cook() {
       setGeneratedRecipes(data.recipes);
       setRetryCount(0);
       setIsGenerating(false);
+      
+      // Auto-generate preview images for all recipes
+      generatePreviewImagesForRecipes(data.recipes);
     } catch (error: any) {
       console.error('Error generating recipes:', error);
       
@@ -227,6 +232,54 @@ export default function Cook() {
     } finally {
       setSavingRecipe(false);
     }
+  };
+
+  // Generate preview image for a single recipe (for suggestion cards)
+  const generatePreviewImage = async (recipe: GeneratedRecipe, index: number) => {
+    setGeneratingPreviewImages(prev => new Set(prev).add(index));
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-recipe-image`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            recipeId: 'preview',
+            recipeTitle: recipe.title,
+            recipeDescription: recipe.description,
+            ingredients: recipe.ingredients.map(i => i.name),
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (data.image_url) {
+        setPreviewImages(prev => ({ ...prev, [index]: data.image_url }));
+        // Also update the recipe object so it persists when selected
+        setGeneratedRecipes(prev => prev.map((r, i) => 
+          i === index ? { ...r, image_url: data.image_url } : r
+        ));
+      }
+    } catch (error) {
+      console.error('Error generating preview image:', error);
+    } finally {
+      setGeneratingPreviewImages(prev => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
+    }
+  };
+
+  // Generate preview images for all recipes
+  const generatePreviewImagesForRecipes = async (recipes: GeneratedRecipe[]) => {
+    setPreviewImages({});
+    // Generate all images in parallel
+    await Promise.all(recipes.map((recipe, index) => generatePreviewImage(recipe, index)));
   };
 
   const generateRecipeMainImage = async (recipe: GeneratedRecipe) => {
@@ -583,8 +636,9 @@ export default function Cook() {
             {generatedRecipes.map((recipe, idx) => (
               <RecipeCard
                 key={idx}
-                recipe={recipe as unknown as SavedRecipe}
-                onClick={() => setSelectedRecipe(recipe)}
+                recipe={{ ...recipe, image_url: previewImages[idx] || recipe.image_url } as unknown as SavedRecipe}
+                onClick={() => setSelectedRecipe({ ...recipe, image_url: previewImages[idx] || recipe.image_url })}
+                isGeneratingImage={generatingPreviewImages.has(idx)}
               />
             ))}
           </div>
