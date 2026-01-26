@@ -1,4 +1,4 @@
-import { Clock, Users, ChefHat } from 'lucide-react';
+import { Clock, Users, ChefHat, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { QuickBadge } from '@/components/ui/quick-badge';
 import { GoalBadge } from '@/components/ui/goal-badge';
@@ -9,9 +9,10 @@ interface RecipeCardProps {
   recipe: SavedRecipe;
   onClick?: () => void;
   className?: string;
+  isGeneratingImage?: boolean;
 }
 
-export function RecipeCard({ recipe, onClick, className }: RecipeCardProps) {
+export function RecipeCard({ recipe, onClick, className, isGeneratingImage }: RecipeCardProps) {
   return (
     <Card
       className={cn(
@@ -27,6 +28,11 @@ export function RecipeCard({ recipe, onClick, className }: RecipeCardProps) {
             alt={recipe.title}
             className="w-full h-full object-cover"
           />
+        ) : isGeneratingImage ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="text-xs text-muted-foreground">Generating image...</span>
+          </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <ChefHat className="h-12 w-12 text-muted-foreground/50" />
