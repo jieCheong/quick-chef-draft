@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { QuickBadge } from '@/components/ui/quick-badge';
 import { GoalBadge } from '@/components/ui/goal-badge';
 import { RecipeCard } from '@/components/recipe/RecipeCard';
+import { RecipeStepCard } from '@/components/recipe/RecipeStepCard';
 import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
 import { RecipeLoadingSkeleton } from '@/components/cook/RecipeLoadingSkeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +47,10 @@ export default function Cook() {
   const [retryCount, setRetryCount] = useState(0);
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [craving, setCraving] = useState('');
+  const [stepImages, setStepImages] = useState<Record<number, string>>({});
+  const [generatingStepImage, setGeneratingStepImage] = useState<number | null>(null);
+  const [recipeImage, setRecipeImage] = useState<string | null>(null);
+  const [generatingRecipeImage, setGeneratingRecipeImage] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -222,6 +227,84 @@ export default function Cook() {
     }
   };
 
+  const generateRecipeMainImage = async (recipe: GeneratedRecipe) => {
+    setGeneratingRecipeImage(true);
+    try {
+      const ingredientList = recipe.ingredients.slice(0, 5).map(i => i.name).join(", ");
+      const prompt = `Professional, appetizing food photography of ${recipe.title}. ${recipe.description || ""} Main ingredients: ${ingredientList}. Styled on a modern plate, soft natural lighting, shallow depth of field, restaurant quality. Ultra high resolution.`;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-recipe-image`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            recipeId: 'temp',
+            recipeTitle: recipe.title,
+            recipeDescription: recipe.description,
+            ingredients: recipe.ingredients.map(i => i.name),
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (data.image_url) {
+        setRecipeImage(data.image_url);
+      }
+    } catch (error) {
+      console.error('Error generating recipe image:', error);
+    } finally {
+      setGeneratingRecipeImage(false);
+    }
+  };
+
+  const generateStepImage = async (step: { step: number; instruction: string }, recipe: GeneratedRecipe) => {
+    setGeneratingStepImage(step.step);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-step-images`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            recipeTitle: recipe.title,
+            stepNumber: step.step,
+            stepInstruction: step.instruction,
+            ingredients: recipe.ingredients.map(i => i.name),
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (data.image_url) {
+        setStepImages(prev => ({ ...prev, [step.step]: data.image_url }));
+        return data.image_url;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error generating step image:', error);
+      return null;
+    } finally {
+      setGeneratingStepImage(null);
+    }
+  };
+
+  // Reset images when selecting a new recipe
+  useEffect(() => {
+    if (selectedRecipe) {
+      setStepImages({});
+      setRecipeImage(null);
+    }
+  }, [selectedRecipe?.title]);
+
   // Recipe Detail View
   if (selectedRecipe) {
     return (
@@ -253,6 +336,34 @@ export default function Cook() {
 
           {/* Recipe Content */}
           <div className="p-4 space-y-6">
+            {/* Hero Image */}
+            <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+              {recipeImage ? (
+                <img
+                  src={recipeImage}
+                  alt={selectedRecipe.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : generatingRecipeImage ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">Generating image...</span>
+                </div>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                  <ChefHat className="h-12 w-12 text-muted-foreground/30" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generateRecipeMainImage(selectedRecipe)}
+                  >
+                    <ImagePlus className="h-4 w-4 mr-2" />
+                    Generate Recipe Image
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Title */}
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -335,24 +446,23 @@ export default function Cook() {
               </CardContent>
             </Card>
 
-            {/* Instructions */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Instructions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ol className="space-y-4">
-                  {selectedRecipe.instructions.map((step, idx) => (
-                    <li key={idx} className="flex gap-3">
-                      <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center flex-shrink-0">
-                        {step.step}
-                      </span>
-                      <p className="text-sm leading-relaxed">{step.instruction}</p>
-                    </li>
-                  ))}
-                </ol>
-              </CardContent>
-            </Card>
+            {/* Step-by-Step Instructions with Images */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold">Step-by-Step Instructions</h3>
+              <div className="space-y-4">
+                {selectedRecipe.instructions.map((step, idx) => (
+                  <RecipeStepCard
+                    key={idx}
+                    step={step}
+                    recipeTitle={selectedRecipe.title}
+                    ingredients={selectedRecipe.ingredients}
+                    imageUrl={stepImages[step.step]}
+                    isGenerating={generatingStepImage === step.step}
+                    onGenerateImage={() => generateStepImage(step, selectedRecipe)}
+                  />
+                ))}
+              </div>
+            </div>
 
             {/* Save Buttons */}
             <div className="space-y-2">
