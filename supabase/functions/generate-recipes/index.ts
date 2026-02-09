@@ -24,9 +24,9 @@ serve(async (req) => {
   try {
     const { ingredients, maxTime, dietaryStyle, allergies, skillLevel, cuisines, goals, craving }: RecipeRequest = await req.json();
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const QuickChef_API_KEY = Deno.env.get("QuickChef_API_KEY");
+    if (!QuickChef_API_KEY) {
+      throw new Error("QuickChef_API_KEY is not configured");
     }
 
     const systemPrompt = `You are a creative, resourceful chef and nutritionist. Generate delicious recipes based on the user's available ingredients and preferences.
@@ -106,10 +106,10 @@ Return JSON with this exact structure:
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 second timeout
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.QuickChef.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${QuickChef_API_KEY}`,
         "Content-Type": "application/json",
       },
       signal: controller.signal,

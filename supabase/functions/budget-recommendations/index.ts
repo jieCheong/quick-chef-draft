@@ -20,9 +20,9 @@ serve(async (req) => {
   try {
     const { budgetAmount, goals, dietaryStyle, allergies }: BudgetRequest = await req.json();
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const QuickChef_API_KEY = Deno.env.get("QuickChef_API_KEY");
+    if (!QuickChef_API_KEY) {
+      throw new Error("QuickChef_API_KEY is not configured");
     }
 
     const systemPrompt = `You are a nutritionist and budget-conscious meal planner. Help users plan their monthly grocery budget based on their health goals.
@@ -58,10 +58,10 @@ Return JSON with this exact structure:
 Include 8-10 key ingredients that support the goals, with realistic cost estimates.
 Provide 3-4 practical money-saving tips.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.QuickChef.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${QuickChef_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

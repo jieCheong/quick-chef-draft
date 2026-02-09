@@ -143,7 +143,7 @@ A simple 4-5 step wizard to capture preferences:
 
 ## Technical Approach
 
-### Backend (Lovable Cloud)
+### Backend (QuickChef Cloud)
 - **User Authentication** - Email/password + Google + Apple via Supabase Auth
 - **Database Tables:**
   - `profiles` - User preferences, dietary info, skill level, monthly goals
@@ -151,7 +151,7 @@ A simple 4-5 step wizard to capture preferences:
   - `saved_recipes` - AI-generated recipes users have favorited
   - `monthly_budgets` - User's budget amount and tracking per month
   - `budget_transactions` - Individual purchase logs for tracking spending
-- **AI Integration** - Lovable AI gateway for:
+- **AI Integration** - QuickChef AI gateway for:
   - Recipe generation with goal alignment
   - Ingredient recommendations based on goals + budget
 
