@@ -7,7 +7,7 @@ A native mobile app that helps users discover personalized recipes based on ingr
 
 ---
 
-## 🔐 Authentication & Onboarding
+## Authentication & Onboarding
 
 ### Sign Up / Sign In Screen
 - Clean, minimal login page with the QuickChef logo
@@ -26,7 +26,7 @@ A simple 4-5 step wizard to capture preferences:
 
 ---
 
-## 🏠 Main Experience
+## Main Experience
 
 ### Home Screen
 - Warm greeting with user's name
@@ -69,15 +69,15 @@ A simple 4-5 step wizard to capture preferences:
 
 ---
 
-## 🎯 Monthly Goals & Budget
+## Monthly Goals & Budget
 
 ### Goals Setup Screen
 - Set up to **3 monthly goals** from options:
-  - 🥑 Keto diet
-  - 🌍 Try different cuisines
-  - 🥬 Eat more veggies
-  - 💪 More protein
-  - 🌾 More fiber
+  -  Keto diet
+  -  Try different cuisines
+  -  Eat more veggies
+  -  More protein
+  -  More fiber
 - Goals can be changed at any time during the month
 - Visual progress indicators for each goal
 
@@ -103,7 +103,7 @@ A simple 4-5 step wizard to capture preferences:
 
 ---
 
-## 🥫 My Pantry
+##  My Pantry
 
 ### Saved Ingredients Screen
 - Users can maintain a persistent list of what they typically have at home
@@ -115,7 +115,7 @@ A simple 4-5 step wizard to capture preferences:
 
 ---
 
-## 💾 Saved Recipes
+##  Saved Recipes
 
 ### Favorites Screen
 - Grid or list view of saved AI-generated recipes
@@ -127,7 +127,7 @@ A simple 4-5 step wizard to capture preferences:
 
 ---
 
-## 👤 Profile & Settings
+##  Profile & Settings
 
 ### Profile Screen
 - View/edit dietary preferences
@@ -165,7 +165,7 @@ A simple 4-5 step wizard to capture preferences:
 - Clean white backgrounds with subtle gray accents
 - Soft rounded corners on cards and buttons
 - Clear typography hierarchy
-- **⚡ Lightning bolt icon** for quick meals
+- ** Lightning bolt icon** for quick meals
 - Food-inspired accent color (warm orange or fresh green)
 - Goal-aligned color coding for visual consistency
 - Generous whitespace for a calm, focused experience
