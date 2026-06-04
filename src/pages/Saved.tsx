@@ -10,11 +10,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RecipeCard } from '@/components/recipe/RecipeCard';
 import { QuickBadge } from '@/components/ui/quick-badge';
 import { GoalBadge } from '@/components/ui/goal-badge';
-import { supabase } from '@/integrations/supabase/client';
-import { Search, BookmarkCheck, Zap, Filter, ChefHat, Clock, ArrowLeft, Bookmark, Trash2 } from 'lucide-react';
+
+import { Search, BookmarkCheck, Zap, Clock, ArrowLeft, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { SavedRecipe, MonthlyGoal } from '@/types/database';
+import type { SavedRecipe } from '@/types/database';
 
 export default function SavedRecipes() {
   const navigate = useNavigate();
@@ -40,32 +40,15 @@ export default function SavedRecipes() {
   }, [user]);
 
   const fetchRecipes = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    const { data, error } = await supabase
-      .from('saved_recipes')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setRecipes(data as unknown as SavedRecipe[]);
-    }
+    // TODO: connect to backend
     setIsLoading(false);
   };
 
   const deleteRecipe = async (id: string) => {
-    const { error } = await supabase
-      .from('saved_recipes')
-      .delete()
-      .eq('id', id);
-
-    if (!error) {
-      setRecipes(recipes.filter(r => r.id !== id));
-      setSelectedRecipe(null);
-      toast({ description: 'Recipe removed from favorites' });
-    }
+    // TODO: connect to backend — remove locally for now
+    setRecipes(recipes.filter(r => r.id !== id));
+    setSelectedRecipe(null);
+    toast({ description: 'Recipe removed from favorites' });
   };
 
   const filteredRecipes = recipes.filter(recipe => {

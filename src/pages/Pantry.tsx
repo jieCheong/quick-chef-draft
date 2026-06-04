@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { X, Package, Search, Loader2 } from 'lucide-react';
+// import { supabase } from '@/integrations/supabase/client';
+import { X, Package, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { INGREDIENT_CATEGORIES, type PantryItem, type IngredientCategory } from '@/types/database';
 
@@ -50,62 +50,29 @@ export default function Pantry() {
   }, [user]);
 
   const fetchItems = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    const { data, error } = await supabase
-      .from('pantry_items')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('category')
-      .order('name');
-
-    if (!error && data) {
-      setItems(data as unknown as PantryItem[]);
-    }
+    // TODO: connect to backend
     setIsLoading(false);
   };
 
   const addItem = async (name: string, category: IngredientCategory = selectedCategory) => {
     if (!user || !name.trim()) return;
-
-    setIsAdding(true);
-    const { error } = await supabase
-      .from('pantry_items')
-      .insert({
-        user_id: user.id,
-        name: name.trim(),
-        category,
-      });
-
-    if (error) {
-      toast({
-        variant: 'destructive',
-        description: 'Failed to add item',
-      });
-    } else {
-      await fetchItems();
-      setInputValue('');
-    }
-    setIsAdding(false);
+    // TODO: connect to backend — add locally for now
+    const newItem: PantryItem = {
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      name: name.trim(),
+      category,
+      quantity: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setItems(prev => [...prev, newItem]);
+    setInputValue('');
   };
 
   const removeItem = async (id: string) => {
-    const { error } = await supabase
-      .from('pantry_items')
-      .delete()
-      .eq('id', id);
-
-    if (!error) {
-      setItems(items.filter(item => item.id !== id));
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addItem(inputValue);
-    }
+    // TODO: connect to backend — remove locally for now
+    setItems(items.filter(item => item.id !== id));
   };
 
   const filteredItems = items.filter(item =>

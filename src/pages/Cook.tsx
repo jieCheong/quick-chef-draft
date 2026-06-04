@@ -5,11 +5,9 @@ import { useProfile } from '@/hooks/useProfile';
 import { useRecipeImage } from '@/hooks/useRecipeImage';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { QuickBadge } from '@/components/ui/quick-badge';
 import { GoalBadge } from '@/components/ui/goal-badge';
 import { RecipeCard } from '@/components/recipe/RecipeCard';
@@ -17,7 +15,7 @@ import { RecipeStepCard } from '@/components/recipe/RecipeStepCard';
 import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
 import { RecipeLoadingSkeleton } from '@/components/cook/RecipeLoadingSkeleton';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+// import { supabase } from '@/integrations/supabase/client';
 import { CookingMode } from '@/components/cook/CookingMode';
 import { 
   ChefHat, Plus, X, Package, Clock, Sparkles, Loader2, Zap, 
@@ -34,7 +32,7 @@ export default function Cook() {
   const { user, loading: authLoading } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
-  const { generateImage, isGenerating: isGeneratingImage } = useRecipeImage();
+  useRecipeImage();
 
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -54,7 +52,6 @@ export default function Cook() {
   const [generatingRecipeImage, setGeneratingRecipeImage] = useState(false);
   const [cookingMode, setCookingMode] = useState(false);
   const [previewImages, setPreviewImages] = useState<Record<number, string>>({});
-  const [generatingPreviewImages, setGeneratingPreviewImages] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -72,7 +69,7 @@ export default function Cook() {
     if (!user) return;
     
     setIsLoadingPantry(true);
-    const { data, error } = await supabase
+    /*const { data, error } = await supabase
       .from('pantry_items')
       .select('*')
       .eq('user_id', user.id)
@@ -80,7 +77,7 @@ export default function Cook() {
 
     if (!error && data) {
       setPantryItems(data as unknown as PantryItem[]);
-    }
+    }*/
     setIsLoadingPantry(false);
   };
 
@@ -118,70 +115,10 @@ export default function Cook() {
     setGeneratedRecipes([]);
     setRetryCount(retry);
 
-    try {
-      // Use fetch with longer timeout instead of supabase.functions.invoke
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-recipes`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({
-            ingredients,
-            maxTime: quickMealsOnly ? 15 : selectedTime,
-            dietaryStyle: profile?.dietary_style,
-            allergies: profile?.allergies,
-            skillLevel: profile?.skill_level,
-            cuisines: profile?.preferred_cuisines,
-            goals: profile?.monthly_goals,
-            craving: craving.trim() || undefined,
-          }),
-          signal: controller.signal,
-        }
-      );
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setGeneratedRecipes(data.recipes);
-      setRetryCount(0);
-      setIsGenerating(false);
-      
-      // Auto-generate preview images for all recipes
-      generatePreviewImagesForRecipes(data.recipes);
-    } catch (error: any) {
-      console.error('Error generating recipes:', error);
-      
-      // Auto-retry with exponential backoff (max 2 retries)
-      if (retry < 2 && error?.name !== 'AbortError') {
-        const delay = Math.pow(2, retry) * 1000; // 1s, 2s
-        toast({
-          description: `Connection slow, retrying...`,
-        });
-        setTimeout(() => generateRecipes(retry + 1), delay);
-        return;
-      }
-      
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error?.name === 'AbortError' 
-          ? 'Request timed out. Please try again.'
-          : 'Failed to generate recipes. Please try again.',
-      });
-      setRetryCount(0);
-      setIsGenerating(false);
-    }
+    // TODO: connect to backend
+    toast({ description: 'Recipe generation coming soon' });
+    setRetryCount(0);
+    setIsGenerating(false);
   };
 
   const saveRecipe = async (recipe: GeneratedRecipe, withImage = false) => {
@@ -189,6 +126,7 @@ export default function Cook() {
 
     setSavingRecipe(true);
     try {
+      /*
       const { data, error } = await supabase
         .from('saved_recipes')
         .insert({
@@ -209,12 +147,12 @@ export default function Cook() {
         .single();
 
       if (error) throw error;
-
+      */
       toast({
         title: 'Recipe saved!',
-        description: withImage ? 'Generating image...' : 'You can find it in your saved recipes.',
+        description: 'Save will work later once backend connected',
       });
-
+      /*
       // Generate image in the background if requested
       if (withImage && data) {
         generateImage(
@@ -224,6 +162,7 @@ export default function Cook() {
           recipe.ingredients
         );
       }
+        */
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -234,47 +173,10 @@ export default function Cook() {
     }
   };
 
-  // Generate preview image for a single recipe (for suggestion cards)
-  const generatePreviewImage = async (recipe: GeneratedRecipe, index: number) => {
-    setGeneratingPreviewImages(prev => new Set(prev).add(index));
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-recipe-image`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({
-            recipeId: 'preview',
-            recipeTitle: recipe.title,
-            recipeDescription: recipe.description,
-            ingredients: recipe.ingredients.map(i => i.name),
-          }),
-        }
-      );
-
-      const data = await response.json();
-      if (data.image_url) {
-        setPreviewImages(prev => ({ ...prev, [index]: data.image_url }));
-        // Also update the recipe object so it persists when selected
-        setGeneratedRecipes(prev => prev.map((r, i) => 
-          i === index ? { ...r, image_url: data.image_url } : r
-        ));
-      }
-    } catch (error) {
-      console.error('Error generating preview image:', error);
-    } finally {
-      setGeneratingPreviewImages(prev => {
-        const next = new Set(prev);
-        next.delete(index);
-        return next;
-      });
-    }
+  // TODO: connect to backend
+  const generatePreviewImage = async (_recipe: GeneratedRecipe, _index: number) => {
+    // no-op stub
   };
-
   // Generate preview images for all recipes
   const generatePreviewImagesForRecipes = async (recipes: GeneratedRecipe[]) => {
     setPreviewImages({});
@@ -282,9 +184,9 @@ export default function Cook() {
     await Promise.all(recipes.map((recipe, index) => generatePreviewImage(recipe, index)));
   };
 
-  const generateRecipeMainImage = async (recipe: GeneratedRecipe) => {
-    setGeneratingRecipeImage(true);
-    try {
+  const generateRecipeMainImage = async (_recipe: GeneratedRecipe) => {
+    setGeneratingRecipeImage(false);
+    /*try {
       const ingredientList = recipe.ingredients.slice(0, 5).map(i => i.name).join(", ");
       const prompt = `Professional, appetizing food photography of ${recipe.title}. ${recipe.description || ""} Main ingredients: ${ingredientList}. Styled on a modern plate, soft natural lighting, shallow depth of field, restaurant quality. Ultra high resolution.`;
 
@@ -315,10 +217,11 @@ export default function Cook() {
     } finally {
       setGeneratingRecipeImage(false);
     }
+    */
   };
 
-  const generateStepImage = async (step: { step: number; instruction: string }, recipe: GeneratedRecipe) => {
-    setGeneratingStepImage(step.step);
+  const generateStepImage = async (step: { step: number; instruction: string }, _recipe: GeneratedRecipe): Promise<string | null> => {
+    /*setGeneratingStepImage(step.step);
     try {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-step-images`,
@@ -349,7 +252,8 @@ export default function Cook() {
       return null;
     } finally {
       setGeneratingStepImage(null);
-    }
+    } */
+   return null;
   };
 
   // Auto-generate step images when selecting a new recipe
@@ -641,7 +545,7 @@ export default function Cook() {
                 key={idx}
                 recipe={{ ...recipe, image_url: previewImages[idx] || recipe.image_url } as unknown as SavedRecipe}
                 onClick={() => setSelectedRecipe({ ...recipe, image_url: previewImages[idx] || recipe.image_url })}
-                isGeneratingImage={generatingPreviewImages.has(idx)}
+                isGeneratingImage={false}
               />
             ))}
           </div>

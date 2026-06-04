@@ -6,24 +6,18 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GoalBadge } from '@/components/ui/goal-badge';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
 import { 
   DollarSign, Target, Plus, TrendingUp, TrendingDown, 
   Sparkles, Loader2, Check, ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MONTHLY_GOALS, type MonthlyGoal, type MonthlyBudget, type BudgetTransaction } from '@/types/database';
-
-interface AIRecommendation {
-  categories: { name: string; percentage: number; amount: number }[];
-  ingredients: { name: string; estimatedCost: number; goalAlignment: MonthlyGoal[] }[];
-  tips: string[];
-}
+import { type MonthlyBudget, type BudgetTransaction } from '@/types/database';
 
 export default function Budget() {
   const navigate = useNavigate();
@@ -39,8 +33,6 @@ export default function Budget() {
   const [transactionAmount, setTransactionAmount] = useState('');
   const [transactionDesc, setTransactionDesc] = useState('');
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
-  const [recommendations, setRecommendations] = useState<AIRecommendation | null>(null);
-  const [isLoadingRecs, setIsLoadingRecs] = useState(false);
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -58,128 +50,56 @@ export default function Budget() {
   }, [user]);
 
   const fetchBudgetData = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    
-    // Fetch current month's budget
-    const { data: budgetData } = await supabase
-      .from('monthly_budgets')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('month', currentMonth)
-      .eq('year', currentYear)
-      .single();
-
-    if (budgetData) {
-      setBudget(budgetData as unknown as MonthlyBudget);
-      setBudgetAmount(budgetData.budget_amount.toString());
-
-      // Fetch transactions
-      const { data: transData } = await supabase
-        .from('budget_transactions')
-        .select('*')
-        .eq('budget_id', budgetData.id)
-        .order('transaction_date', { ascending: false });
-
-      if (transData) {
-        setTransactions(transData as unknown as BudgetTransaction[]);
-      }
-    }
-    
+    // TODO: connect to backend
     setIsLoading(false);
   };
 
   const saveBudget = async () => {
     if (!user || !budgetAmount) return;
-
     setIsSaving(true);
-    
+    // TODO: connect to backend — update locally for now
+    const amount = parseFloat(budgetAmount);
     if (budget) {
-      // Update existing
-      const { error } = await supabase
-        .from('monthly_budgets')
-        .update({ budget_amount: parseFloat(budgetAmount) })
-        .eq('id', budget.id);
-
-      if (!error) {
-        setBudget({ ...budget, budget_amount: parseFloat(budgetAmount) });
-        toast({ description: 'Budget updated!' });
-      }
+      setBudget({ ...budget, budget_amount: amount });
+      toast({ description: 'Budget updated!' });
     } else {
-      // Create new
-      const { data, error } = await supabase
-        .from('monthly_budgets')
-        .insert({
-          user_id: user.id,
-          month: currentMonth,
-          year: currentYear,
-          budget_amount: parseFloat(budgetAmount),
-        })
-        .select()
-        .single();
-
-      if (!error && data) {
-        setBudget(data as unknown as MonthlyBudget);
-        toast({ description: 'Budget set!' });
-      }
+      setBudget({
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        month: currentMonth,
+        year: currentYear,
+        budget_amount: amount,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as MonthlyBudget);
+      toast({ description: 'Budget set!' });
     }
-    
     setIsSaving(false);
   };
 
   const addTransaction = async () => {
     if (!user || !budget || !transactionAmount) return;
-
     setIsAddingTransaction(true);
-    
-    const { data, error } = await supabase
-      .from('budget_transactions')
-      .insert({
-        user_id: user.id,
-        budget_id: budget.id,
-        amount: parseFloat(transactionAmount),
-        description: transactionDesc || 'Grocery purchase',
-      })
-      .select()
-      .single();
-
-    if (!error && data) {
-      setTransactions([data as unknown as BudgetTransaction, ...transactions]);
-      setTransactionAmount('');
-      setTransactionDesc('');
-      toast({ description: 'Purchase logged!' });
-    }
-    
+    // TODO: connect to backend — add locally for now
+    const newTransaction: BudgetTransaction = {
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      budget_id: budget.id,
+      amount: parseFloat(transactionAmount),
+      description: transactionDesc || 'Grocery purchase',
+      transaction_date: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    } as BudgetTransaction;
+    setTransactions([newTransaction, ...transactions]);
+    setTransactionAmount('');
+    setTransactionDesc('');
+    toast({ description: 'Purchase logged!' });
     setIsAddingTransaction(false);
   };
 
   const getRecommendations = async () => {
-    if (!budget || !profile?.monthly_goals?.length) return;
-
-    setIsLoadingRecs(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('budget-recommendations', {
-        body: {
-          budgetAmount: budget.budget_amount,
-          goals: profile.monthly_goals,
-          dietaryStyle: profile.dietary_style,
-          allergies: profile.allergies,
-        },
-      });
-
-      if (error) throw error;
-      setRecommendations(data);
-    } catch (error) {
-      console.error('Error getting recommendations:', error);
-      toast({
-        variant: 'destructive',
-        description: 'Failed to get recommendations',
-      });
-    } finally {
-      setIsLoadingRecs(false);
-    }
+    // TODO: connect to backend
+    toast({ description: 'AI recommendations coming soon' });
   };
 
   const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
@@ -298,52 +218,14 @@ export default function Budget() {
               <CardDescription>Ingredients that fit your budget and goals</CardDescription>
             </CardHeader>
             <CardContent>
-              {recommendations ? (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium mb-2">Suggested ingredients:</p>
-                    <div className="space-y-2">
-                      {recommendations.ingredients.slice(0, 6).map((ing, idx) => (
-                        <div key={idx} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">{ing.name}</span>
-                            {ing.goalAlignment.map(g => (
-                              <span key={g} className="text-xs">
-                                {MONTHLY_GOALS.find(m => m.value === g)?.emoji}
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-sm text-muted-foreground">~${ing.estimatedCost}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {recommendations.tips.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium mb-2">Tips:</p>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        {recommendations.tips.map((tip, idx) => (
-                          <li key={idx}>• {tip}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={getRecommendations}
-                  disabled={isLoadingRecs}
-                >
-                  {isLoadingRecs ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 mr-2" />
-                  )}
-                  Get Recommendations
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={getRecommendations}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Get Recommendations
+              </Button>
             </CardContent>
           </Card>
         )}
