@@ -1,3 +1,12 @@
+/*
+Designed a PostgreSQL schema with six tables. Users and profiles
+are split so auth queries stay fast. Recipe data uses JSONB columns 
+for flexible nested structures like ingredients and instructions. 
+I added a usage_daily table with a unique constraint on user_id + date 
+so I can use an atomic upsert to enforce rate limits without race conditions. 
+All foreign keys use CASCADE deletes so I don't get orphaned data.
+*/
+
 -- This file defines every table in the QuickChef db
 -- To run: psql -U <username> -d <database_name> -f schema.sql
 -- Important: The order of CREATE TABLE statements matters

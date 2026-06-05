@@ -22,7 +22,7 @@ dotenv.config();
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   // ssl tells the pg driver to use ssl but not verify the certificate
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: { rejectUnauthorized: false },
 });
 
 // test the connection when module loads
