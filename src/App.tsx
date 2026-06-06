@@ -13,31 +13,36 @@ import Saved from "./pages/Saved";
 import Budget from "./pages/Budget";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
           <Routes>
-            <Route path="/" element={<Index />} />
+            {/* Protected routes - redirect to /auth if not logged in*/}
+            <Route path="/" element={
+              <ProtectedRoute><Index /></ProtectedRoute> } />
+            {/*Public routes - no auth required*/}
             <Route path="/auth" element={<Auth />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/cook" element={<Cook />} />
-            <Route path="/pantry" element={<Pantry />} />
-            <Route path="/saved" element={<Saved />} />
-            <Route path="/budget" element={<Budget />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/onboarding" element={
+              <ProtectedRoute><Onboarding /></ProtectedRoute>} />
+            <Route path="/cook" element={<ProtectedRoute><Cook /></ProtectedRoute>} />
+            <Route path="/pantry" element={<ProtectedRoute><Pantry /></ProtectedRoute>} />
+            <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
+            <Route path="/budget" element={<ProtectedRoute><Budget /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+        </TooltipProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 
