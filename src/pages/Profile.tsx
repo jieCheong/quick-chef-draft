@@ -29,7 +29,7 @@ import {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { profile, loading: profileLoading, updateProfile } = useProfile();
   const { toast } = useToast();
 
@@ -43,12 +43,6 @@ export default function Profile() {
   const [skillLevel, setSkillLevel] = useState<SkillLevel>('beginner');
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [authLoading, user, navigate]);
 
   useEffect(() => {
     if (profile) {
@@ -118,7 +112,7 @@ export default function Profile() {
     navigate('/auth');
   };
 
-  if (authLoading || profileLoading) {
+  if (profileLoading) {
     return (
       <MobileLayout>
         <div className="p-4 space-y-4">
