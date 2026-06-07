@@ -15,7 +15,7 @@ import { RecipeStepCard } from '@/components/recipe/RecipeStepCard';
 import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
 import { RecipeLoadingSkeleton } from '@/components/cook/RecipeLoadingSkeleton';
 import { useToast } from '@/hooks/use-toast';
-// import { supabase } from '@/integrations/supabase/client';
+import { apiGet, apiPost } from '@/lib/api';
 import { CookingMode } from '@/components/cook/CookingMode';
 import { 
   ChefHat, Plus, X, Package, Clock, Sparkles, Loader2, Zap, 
@@ -29,7 +29,7 @@ type GeneratedRecipe = Omit<SavedRecipe, 'id' | 'user_id' | 'created_at' | 'upda
 export default function Cook() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
   useRecipeImage();
@@ -54,12 +54,6 @@ export default function Cook() {
   const [previewImages, setPreviewImages] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [authLoading, user, navigate]);
-
-  useEffect(() => {
     if (user) {
       fetchPantryItems();
     }
@@ -69,16 +63,14 @@ export default function Cook() {
     if (!user) return;
     
     setIsLoadingPantry(true);
-    /*const { data, error } = await supabase
-      .from('pantry_items')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('name');
-
-    if (!error && data) {
-      setPantryItems(data as unknown as PantryItem[]);
-    }*/
-    setIsLoadingPantry(false);
+    try {
+      const items = await apiGet<PantryItem[]>('/api/pantry');
+      setPantryItems(items);
+    } catch (error) {
+      console.error('Failed to load pantry items: ', error);
+    } finally {
+      setIsLoadingPantry(false);
+    }
   };
 
   const addIngredient = (ingredient: string) => {
@@ -126,43 +118,13 @@ export default function Cook() {
 
     setSavingRecipe(true);
     try {
-      /*
-      const { data, error } = await supabase
-        .from('saved_recipes')
-        .insert({
-          user_id: user.id,
-          title: recipe.title,
-          description: recipe.description,
-          image_url: recipe.image_url,
-          cooking_time_minutes: recipe.cooking_time_minutes,
-          difficulty: recipe.difficulty,
-          servings: recipe.servings,
-          ingredients: recipe.ingredients as any,
-          instructions: recipe.instructions as any,
-          nutrition: recipe.nutrition as any,
-          cuisines: recipe.cuisines,
-          goal_alignment: recipe.goal_alignment,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      */
+      await apiPost<SavedRecipe>('/api/recipes', recipe);
       toast({
         title: 'Recipe saved!',
-        description: 'Save will work later once backend connected',
+        description: withImage
+        ? 'Image generation coming'
+        : 'Find it in saved recipes',
       });
-      /*
-      // Generate image in the background if requested
-      if (withImage && data) {
-        generateImage(
-          data.id,
-          recipe.title,
-          recipe.description || undefined,
-          recipe.ingredients
-        );
-      }
-        */
     } catch (error) {
       toast({
         variant: 'destructive',
