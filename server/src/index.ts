@@ -17,9 +17,13 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import './db';
+
 import authRouter from './routes/auth';
 import profileRouter from './routes/profile';
+import pantryRouter from './routes/pantry';
+import recipesRouter from './routes/recipes';
 
+// create express app
 const app = express();
 app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -40,6 +44,8 @@ app.get('/health', (_req, res) => {
 // routes
 app.use('/api/auth', authRouter);
 app.use('/api/profile', profileRouter);
+app.use('/api/pantry', pantryRouter);
+app.use('/api/recipes', recipesRouter);
 
 app.use((_req, res) => {
     res.status(404).json({message: 'Route not found'});

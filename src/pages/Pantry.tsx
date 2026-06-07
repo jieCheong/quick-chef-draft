@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
 import { useToast } from '@/hooks/use-toast';
-// import { supabase } from '@/integrations/supabase/client';
+import { apiGet, apiPost, apiDelete } from '@/lib/api';
 import { X, Package, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { INGREDIENT_CATEGORIES, type PantryItem, type IngredientCategory } from '@/types/database';
@@ -27,7 +27,7 @@ const COMMON_ITEMS: Record<IngredientCategory, string[]> = {
 
 export default function Pantry() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const [items, setItems] = useState<PantryItem[]>([]);
@@ -38,41 +38,45 @@ export default function Pantry() {
   const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [authLoading, user, navigate]);
-
-  useEffect(() => {
     if (user) {
       fetchItems();
     }
   }, [user]);
 
   const fetchItems = async () => {
-    // TODO: connect to backend
-    setIsLoading(false);
+    setIsLoading(true);
+    try {
+      const data = await apiGet<PantryItem[]>('/api/pantry');
+      setItems(data);
+    } catch {
+      toast({ variant: 'destructive', description: 'Failed to load pantry items.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const addItem = async (name: string, category: IngredientCategory = selectedCategory) => {
     if (!user || !name.trim()) return;
-    // TODO: connect to backend — add locally for now
-    const newItem: PantryItem = {
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      name: name.trim(),
-      category,
-      quantity: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setItems(prev => [...prev, newItem]);
-    setInputValue('');
+    setIsAdding(true);
+    try {
+      const newItem = await apiPost<PantryItem>('/api/pantry', { name: name.trim(), category });
+      setItems(prev => [...prev, newItem]);
+      setInputValue('');
+    } catch (err) {
+      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Failed to add item.' });
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const removeItem = async (id: string) => {
-    // TODO: connect to backend — remove locally for now
-    setItems(items.filter(item => item.id !== id));
+    setItems(prev => prev.filter(item => item.id !== id));
+    try {
+      await apiDelete(`/api/pantry/${id}`);
+    } catch {
+      toast({ variant: 'destructive', description: 'Failed to remove item.' });
+      fetchItems();
+    }
   };
 
   const filteredItems = items.filter(item =>
@@ -87,7 +91,7 @@ export default function Pantry() {
     return acc;
   }, {} as Record<IngredientCategory, PantryItem[]>);
 
-  if (authLoading || isLoading) {
+  if (isLoading) {
     return (
       <MobileLayout>
         <div className="p-4 space-y-4">

@@ -11,6 +11,7 @@ import { RecipeCard } from '@/components/recipe/RecipeCard';
 import { QuickBadge } from '@/components/ui/quick-badge';
 import { GoalBadge } from '@/components/ui/goal-badge';
 
+import { apiGet, apiDelete } from '@/lib/api';
 import { Search, BookmarkCheck, Zap, Clock, ArrowLeft, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +19,7 @@ import type { SavedRecipe } from '@/types/database';
 
 export default function SavedRecipes() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
@@ -28,27 +29,33 @@ export default function SavedRecipes() {
   const [selectedRecipe, setSelectedRecipe] = useState<SavedRecipe | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [authLoading, user, navigate]);
-
-  useEffect(() => {
     if (user) {
       fetchRecipes();
     }
   }, [user]);
 
   const fetchRecipes = async () => {
-    // TODO: connect to backend
-    setIsLoading(false);
+    setIsLoading(true);
+    try {
+      const data = await apiGet<SavedRecipe[]>('/api/recipes');
+      setRecipes(data);
+    } catch {
+      toast({ variant: 'destructive', description: 'Failed to load saved recipes.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const deleteRecipe = async (id: string) => {
-    // TODO: connect to backend — remove locally for now
-    setRecipes(recipes.filter(r => r.id !== id));
+    setRecipes(prev => prev.filter(r => r.id !== id));
     setSelectedRecipe(null);
     toast({ description: 'Recipe removed from favorites' });
+    try {
+      await apiDelete(`/api/recipes/${id}`);
+    } catch {
+      toast({ variant: 'destructive', description: 'Failed to delete recipe.' });
+      fetchRecipes();
+    }
   };
 
   const filteredRecipes = recipes.filter(recipe => {
@@ -173,7 +180,7 @@ export default function SavedRecipes() {
     );
   }
 
-  if (authLoading || isLoading) {
+  if ( isLoading) {
     return (
       <MobileLayout>
         <div className="p-4 space-y-4">
