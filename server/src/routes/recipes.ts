@@ -7,20 +7,14 @@ router.use(requireAuth);
 
 // get
 router.get('/', async(req: Request, res: Response): Promise<void> => {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : null;
     try {
-        const result = await pool.query(
-            `SELECT
-                id, user_id, title, description, image_url,
-                cooking_time_minutes, difficulty, servings,
-                cuisines, goal_alignment, is_quick_meal,
-                ingredients, instructions, nutrition,
-                created_at, updated_at
-            FROM saved_recipes
-            WHERE user_id = $1
-            ORDER BY created_at DESC`,
-            [req.userId]
-        );
-        res.json(result.rows);
+        const query = limit
+            ? `SELECT * FROM saved_recipes WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`
+            : `SELECT * FROM saved_recipes WHERE user_id = $1 ORDER BY created_at DESC`;
+            const params = limit ? [req.userId, limit] : [req.userId];
+            const result = await pool.query(query, params);  
+            res.json(result.rows);
     } catch (error) {
         console.error('GET /api/recipes error:', error);
         res.status(500).json({message: 'Failed to fetch saved recipes.'});

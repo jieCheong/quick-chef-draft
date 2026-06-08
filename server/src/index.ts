@@ -10,9 +10,11 @@ This file does:
 
 It is like main function of the backend.
 */
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+
+dotenv.config();
 
 import './db';
 
@@ -21,6 +23,7 @@ import profileRouter from './routes/profile';
 import pantryRouter from './routes/pantry';
 import recipesRouter from './routes/recipes';
 import generateRouter from './routes/generate';
+import viralRouter from './routes/viral';
 
 // create express app
 const app = express();
@@ -46,6 +49,7 @@ app.use('/api/profile', profileRouter);
 app.use('/api/pantry', pantryRouter);
 app.use('/api/recipes', recipesRouter);
 app.use('/api/generate-recipe', generateRouter);
+app.use('/api/viral-recipes', viralRouter);
 
 app.use((_req, res) => {
     res.status(404).json({message: 'Route not found'});

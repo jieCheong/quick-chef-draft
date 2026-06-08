@@ -1,25 +1,36 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QuickBadge } from '@/components/ui/quick-badge';
 import { GoalBadge } from '@/components/ui/goal-badge';
-import { ChefHat, Zap, DollarSign, TrendingUp, ArrowRight } from 'lucide-react';
+import { apiGet } from '@/lib/api';
+import { ChefHat, Zap, Clock, Flame, Bookmark, TrendingUp, ArrowRight } from 'lucide-react';
+import type { SavedRecipe } from '@/types/database';
+
+interface ViralRecipe {
+  id: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  tags: string[];
+  nutrition: { calories: number; protein: number } | null;
+}
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [authLoading, user, navigate]);
+  const [recentRecipes, setRecentRecipes] = useState<SavedRecipe[]>([]);
+  const [viralRecipes, setViralRecipes] = useState<ViralRecipe[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [loadingViral, setLoadingViral] = useState(true);
 
   useEffect(() => {
     if (!profileLoading && profile && !profile.onboarding_completed) {
@@ -27,7 +38,37 @@ export default function Home() {
     }
   }, [profileLoading, profile, navigate]);
 
-  if (authLoading || profileLoading) {
+  // fetch recent saved recipes
+  useEffect(() => {
+    if (!user) return;
+    const fetchRecent = async () => {
+      try {
+        const data = await apiGet<SavedRecipe[]>('/api/recipes?limit=3');
+        setRecentRecipes(data);
+      } catch {
+
+      } finally {
+        setLoadingRecent(false);
+      }
+    };
+    fetchRecent();
+    }, [user]);
+
+    useEffect(() => {
+      const fetchViral = async () => {
+        try {
+          const data = await apiGet<ViralRecipe[]>('/api/viral-recipes');
+          setViralRecipes(data);
+        } catch {
+
+        } finally {
+          setLoadingViral(false);
+        }
+      };
+      fetchViral();
+    }, []);
+
+  if (profileLoading) {
     return (
       <MobileLayout>
         <div className="p-4 space-y-6">
@@ -47,7 +88,7 @@ export default function Home() {
     return 'Good evening';
   };
 
-  const displayName = profile?.display_name || 'Chef';
+  const displayName = profile?.display_name || user?.email?.split('@')[0] ||'Chef';
 
   return (
     <MobileLayout>
@@ -58,6 +99,23 @@ export default function Home() {
           <h1 className="text-2xl font-bold">{displayName} 👋</h1>
         </div>
 
+          <Card 
+            className="bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 transition-colors"
+            onClick={() => navigate('/cook')}
+            >
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
+                <ChefHat className="h-7 w-7" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg">What should I cook?
+                </h3>
+                <p className="text-sm opacity-90">Get AI-powered recipe suggestions</p>
+                </div>
+                <ArrowRight className="h-5 w-5" />
+              </CardContent>
+            </Card>
+
         {/* Quick Meals Section */}
         <section className="space-y-3">
           <div className="flex items-center gap-2">
@@ -65,6 +123,7 @@ export default function Home() {
             <h2 className="font-semibold">Quick Meals</h2>
             <QuickBadge size="sm" />
           </div>
+
           <Card className="bg-gradient-to-br from-quick/10 to-primary/5 border-quick/20">
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground mb-3">
@@ -82,22 +141,67 @@ export default function Home() {
           </Card>
         </section>
 
-        {/* Main CTA */}
-        <Card 
-          className="bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 transition-colors"
-          onClick={() => navigate('/cook')}
-        >
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-              <ChefHat className="h-7 w-7" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">What should I cook?</h3>
-              <p className="text-sm opacity-90">Get AI-powered recipe suggestions</p>
-            </div>
-            <ArrowRight className="h-5 w-5" />
-          </CardContent>
-        </Card>
+        {/* Viral Recipes - Trending this week */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Flame className="h-5 w-5 text-orange-500" />
+            <h2 className="font-semibold">Trending This Week
+            </h2>
+          </div>
+
+          {loadingViral ? (
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-32 w-40 flex-shrink-0 rounded-xl" />
+              ))}
+              </div>
+          ) : viralRecipes.length > 0 ? (
+            <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4">
+              {viralRecipes.map((recipe) => (
+                <Card
+                  key={recipe.id}
+                  className="flex-shrink-0 w-44 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => navigate('/cook')}
+                  >
+                    {recipe.image_url ? (
+                      <div className="h-24 rounded-t-lg overflow-hidden">
+                        <img
+                          src={recipe.image_url}
+                          alt={recipe.title}
+                          className="w-full h-full object-cover"
+                          />
+                      </div>
+                    ) : (
+                      <div className="h-24 rounded-t-lg bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
+                        <Flame className="h-8 w-8 text-orange-400"/>
+                        </div>
+                    )}
+                    <CardContent className="p-2">
+                      <p className="text-xs font-medium line-clamp-2">{recipe.title}</p>
+                      {recipe.nutrition && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {recipe.nutrition.calories} cal · {recipe.nutrition.protein}g protein
+                        </p>
+                      )}
+                      </CardContent>
+                  </Card>
+              ))}
+
+              </div>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="p-4 text-center">
+                <Flame className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Trending recipes coming soon
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add rows to viral_recipes in Neon to show content here.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </section>        
 
         {/* Monthly Goals */}
         {profile?.monthly_goals && profile.monthly_goals.length > 0 && (
@@ -116,60 +220,69 @@ export default function Home() {
           </section>
         )}
 
-        {/* Budget Overview */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-accent" />
-              <h2 className="font-semibold">Grocery Budget</h2>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/budget')}>
-              Manage
-            </Button>
-          </div>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">This month</span>
-                <TrendingUp className="h-4 w-4 text-accent" />
-              </div>
-              <p className="text-2xl font-bold">Set your budget</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Track spending and get AI recommendations
-              </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-3"
-                onClick={() => navigate('/budget')}
-              >
-                Get Started
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
-
         {/* Recent Recipes Placeholder */}
         <section className="space-y-3">
+          <div className="flex items-center justify-between">
           <h2 className="font-semibold">Recent Recipes</h2>
-          <Card className="border-dashed">
-            <CardContent className="p-6 text-center">
-              <ChefHat className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-              <p className="text-sm text-muted-foreground">
-                No recipes yet. Start cooking to see your history here!
-              </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-3"
-                onClick={() => navigate('/cook')}
-              >
-                Generate Recipe
+          {recentRecipes.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => navigate('/saved')}>
+              See all
               </Button>
-            </CardContent>
-          </Card>
-        </section>
-      </div>
-    </MobileLayout>
+          )}
+          </div>
+          {loadingRecent ? (
+            <div className="space-y-2">
+              <Skeleton className="h-16 w-full rounded-xl" />
+              <Skeleton className="h-16 w-full rounded-xl" />
+            </div>
+          ): recentRecipes.length > 0 ? (
+            <div className="space-y-2">
+              {recentRecipes.map((recipe) => (
+                <Card
+                  key={recipe.id}
+                  className="cursor-pointer hover:shadow-sm transition-shadow"
+                  onClick={() => navigate('/saved')}
+                  >
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <ChefHat className="h-5 w-5 text-primary"/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {recipe.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {recipe.cooking_time_minutes} min 
+                        </span>
+                        {recipe.is_quick_meal && <QuickBadge size="sm" />}
+                      </div>
+                    </div>
+                    <Bookmark className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    </CardContent>
+                  </Card>
+              ))}
+              </div>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="p-6 text-center">
+                <ChefHat className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3"/>
+                <p className="text-sm text-muted-foreground">
+                  No recipes yet. Start cooking!
+                </p>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='mt-3'
+                  onClick={() => navigate('/cook')}
+                  >
+                    Generate Recipe 
+                  </Button> 
+                </CardContent>
+              </Card>
+          )}
+          </section>
+        </div>
+        </MobileLayout>
   );
 }
