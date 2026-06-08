@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { MobileLayout } from '@/components/layout/MobileLayout';
@@ -28,13 +28,7 @@ export default function SavedRecipes() {
   const [quickFilter, setQuickFilter] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<SavedRecipe | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchRecipes();
-    }
-  }, [user]);
-
-  const fetchRecipes = async () => {
+  const fetchRecipes = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await apiGet<SavedRecipe[]>('/api/recipes');
@@ -44,7 +38,13 @@ export default function SavedRecipes() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (user) {
+      fetchRecipes();
+    }
+  }, [user, fetchRecipes]);
 
   const deleteRecipe = async (id: string) => {
     setRecipes(prev => prev.filter(r => r.id !== id));

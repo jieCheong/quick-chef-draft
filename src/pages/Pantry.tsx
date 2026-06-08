@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { MobileLayout } from '@/components/layout/MobileLayout';
@@ -37,13 +37,7 @@ export default function Pantry() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchItems();
-    }
-  }, [user]);
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await apiGet<PantryItem[]>('/api/pantry');
@@ -53,7 +47,13 @@ export default function Pantry() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (user) {
+      fetchItems();
+    }
+  }, [user, fetchItems]);
 
   const addItem = async (name: string, category: IngredientCategory = selectedCategory) => {
     if (!user || !name.trim()) return;
