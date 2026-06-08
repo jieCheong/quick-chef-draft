@@ -107,10 +107,60 @@ export default function Cook() {
     setGeneratedRecipes([]);
     setRetryCount(retry);
 
-    // TODO: connect to backend
-    toast({ description: 'Recipe generation coming soon' });
+    try {
+    const data = await apiPost<{
+      recipes: GeneratedRecipe[];
+      usage: { used: number; max: number; remaining: number };
+    }>('/api/generate-recipe', {
+      ingredients,
+      maxTime: quickMealsOnly ? 15 : selectedTime,
+      dietaryStyle: profile?.dietary_style,
+      allergies: profile?.allergies,
+      skillLevel: profile?.skill_level,
+      cuisines: profile?.preferred_cuisines,
+      goals: profile?.monthly_goals,
+      craving: craving.trim() || undefined,
+    });
+
+    setGeneratedRecipes(data.recipes);
+
+    if (data.usage.remaining === 1) {
+      toast({ description: '1 free generation remaining today.' });
+    } else if (data.usage.remaining === 0) {
+      toast({ description: "You've used all free generations for today." });
+    }
+
     setRetryCount(0);
+  } catch (error: any) {
+    // 429 = daily limit hit
+    if (error?.message?.includes('Daily limit')) {
+      toast({
+        variant: 'destructive',
+        title: 'Daily limit reached',
+        description: error.message,
+      });
+      setIsGenerating(false);
+      return;
+    }
+
+    // Auto-retry for other errors
+    if (retry < 2) {
+      const delay = Math.pow(2, retry) * 1000;
+      toast({ description: `Connection slow, retrying...` });
+      setTimeout(() => generateRecipes(retry + 1), delay);
+      return;
+    }
+
+    toast({
+      variant: 'destructive',
+      title: 'Error',
+      description: 'Failed to generate recipes. Please try again.',
+    });
+    setRetryCount(0);
+  } finally {
     setIsGenerating(false);
+  }
+   
   };
 
   const saveRecipe = async (recipe: GeneratedRecipe, withImage = false) => {
