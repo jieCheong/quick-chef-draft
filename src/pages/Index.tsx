@@ -46,7 +46,7 @@ export default function Home() {
         const data = await apiGet<SavedRecipe[]>('/api/recipes?limit=3');
         setRecentRecipes(data);
       } catch {
-
+        // silently fail — home page still renders without recent recipes
       } finally {
         setLoadingRecent(false);
       }
@@ -60,7 +60,7 @@ export default function Home() {
           const data = await apiGet<ViralRecipe[]>('/api/viral-recipes');
           setViralRecipes(data);
         } catch {
-
+          // silently fail — home page still renders without viral recipes
         } finally {
           setLoadingViral(false);
         }

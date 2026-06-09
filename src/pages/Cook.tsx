@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -53,15 +53,9 @@ export default function Cook() {
   const [cookingMode, setCookingMode] = useState(false);
   const [previewImages, setPreviewImages] = useState<Record<number, string>>({});
 
-  useEffect(() => {
-    if (user) {
-      fetchPantryItems();
-    }
-  }, [user]);
-
-  const fetchPantryItems = async () => {
+  const fetchPantryItems = useCallback(async () => {
     if (!user) return;
-    
+
     setIsLoadingPantry(true);
     try {
       const items = await apiGet<PantryItem[]>('/api/pantry');
@@ -71,7 +65,13 @@ export default function Cook() {
     } finally {
       setIsLoadingPantry(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchPantryItems();
+    }
+  }, [user, fetchPantryItems]);
 
   const addIngredient = (ingredient: string) => {
     const trimmed = ingredient.trim().toLowerCase();
@@ -131,9 +131,9 @@ export default function Cook() {
     }
 
     setRetryCount(0);
-  } catch (error: any) {
+  } catch (error) {
     // 429 = daily limit hit
-    if (error?.message?.includes('Daily limit')) {
+    if (error instanceof Error && error.message.includes('Daily limit')) {
       toast({
         variant: 'destructive',
         title: 'Daily limit reached',
@@ -273,18 +273,18 @@ export default function Cook() {
     if (selectedRecipe) {
       setStepImages({});
       setCookingMode(false);
-      
-      // Use existing image if available, otherwise generate
+
       if (selectedRecipe.image_url) {
         setRecipeImage(selectedRecipe.image_url);
       } else {
         setRecipeImage(null);
         generateRecipeMainImage(selectedRecipe);
       }
-      
-      // Auto-generate all step images
+
       generateStepImagesAuto(selectedRecipe);
     }
+  // Only re-run when the recipe changes (title is the stable identity key)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRecipe?.title]);
 
   // Generate step images automatically in batches

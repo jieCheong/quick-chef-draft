@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -37,7 +37,7 @@ export function CookingMode({
   const progress = ((currentStep + 1) / totalSteps) * 100;
 
   // Speak the current step
-  const speakStep = (text: string) => {
+  const speakStep = useCallback((text: string) => {
     if (!voiceEnabled || !('speechSynthesis' in window)) return;
 
     // Cancel any ongoing speech
@@ -49,10 +49,10 @@ export function CookingMode({
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-    
+
     synthRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  };
+  }, [voiceEnabled]);
 
   // Auto-speak when step changes
   useEffect(() => {
@@ -62,7 +62,7 @@ export function CookingMode({
     return () => {
       window.speechSynthesis.cancel();
     };
-  }, [currentStep, voiceEnabled]);
+  }, [currentStep, voiceEnabled, isPaused, speakStep, step]);
 
   // Cleanup on unmount
   useEffect(() => {
