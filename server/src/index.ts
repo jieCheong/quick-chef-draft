@@ -31,10 +31,12 @@ const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
     .split(',')
     .map(o => o.trim());
 
+// Allow any localhost or RFC-1918 private-network IP (for local dev / device testing)
+const localOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/;
+
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow server-to-server requests (no origin) and any listed origin
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin || allowedOrigins.includes(origin) || localOrigin.test(origin)) {
             callback(null, true);
         } else {
             callback(new Error(`CORS: origin ${origin} not allowed`));
