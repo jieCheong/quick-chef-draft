@@ -292,7 +292,17 @@ export default function Auth() {
             </CardContent>
           </Tabs>
         </Card>
+
+        {/* Required by App Store and Google Play */}
+        <p className="text-center text-xs text-muted-foreground px-6">
+          By continuing, you agree to our{' '}
+          <a href="/terms" className="underline hover:text-foreground">Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy" className="underline hover:text-foreground">Privacy Policy</a>
+        </p>
+
       </div>
     </div>
   );
 }
+
