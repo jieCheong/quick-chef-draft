@@ -19,11 +19,16 @@ import pool from '../db';
 import { requireAuth } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { generateRecipeSchema, GenerateRecipeInput } from '../schemas/generate.schema';
+import { retryWithBackoff, isRetryableOpenAIError } from '../lib/retryWithBackoff';
 
 const router = Router();
 router.use(requireAuth);
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _openai;
+}
 
 async function checkUsageLimit(userId: string): Promise<{ allowed: boolean; used: number; max: number }> {
   const today = new Date().toISOString().split('T')[0];
@@ -141,12 +146,25 @@ router.post('/', validate(generateRecipeSchema), async (req: Request, res: Respo
   try {
     const prompt = buildPrompt(input);
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 3000,
-      temperature: 0.8,
-    });
+    // Only the OpenAI call itself is retried — not buildPrompt (pure,
+    // can't transiently fail), not the JSON parsing or usage increment
+    // that happen after. Retrying those would be either pointless
+    // (parsing a string doesn't get less malformed on a second try)
+    // or actively wrong (incrementing usage twice for one logical attempt).
+    const completion = await retryWithBackoff(
+      () =>
+        getOpenAI().chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 3000,
+          temperature: 0.8,
+        }),
+      {
+        maxRetries: 2,
+        baseDelayMs: 500,
+        shouldRetry: isRetryableOpenAIError,
+      }
+    );
 
     const content = completion.choices[0]?.message?.content;
     if (!content) throw new Error('OpenAI returned empty response');
@@ -181,7 +199,15 @@ router.post('/', validate(generateRecipeSchema), async (req: Request, res: Respo
     // message) so Pino preserves the full stack trace as structured
     // data — visible and expandable in Railway's log viewer, rather
     // than flattened into a single unreadable line of text.
-    req.log.error({ err: error }, 'OpenAI recipe generation failed');
+    //
+    // retryable distinguishes "OpenAI was flaky and retries didn't help"
+    // from "this was never going to succeed, retrying was correctly
+    // skipped" — both surface as a 500 to the user, but they mean
+    // different things to someone reading logs to debug a spike in errors.
+    req.log.error(
+      { err: error, retryable: isRetryableOpenAIError(error) },
+      'OpenAI recipe generation failed'
+    );
     const message = error instanceof Error ? error.message : 'Failed to generate recipes.';
     res.status(500).json({ message });
   }
