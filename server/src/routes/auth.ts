@@ -14,6 +14,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../db';
 import { requireAuth } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { registerSchema, loginSchema, RegisterInput, LoginInput } from '../schemas/auth.schema';
 
 const router = Router();
 
@@ -36,31 +38,13 @@ function signToken(userId: string, email: string): string {
 //   4. INSERT new user into the users table
 //   5. Sign a JWT with the new user's id
 //   6. Return { user, token }
-router.post('/register', async (req: Request, res: Response): Promise<void> => {
-    const { email, password, display_name } = req.body;
+router.post('/register', validate(registerSchema), async (req: Request, res: Response): Promise<void> => {
+    const { email, password, display_name } = req.body as RegisterInput;
 
-    // input validation
-    if (!email || !password) {
-        res.status(400).json({message: 'Email and password are required.'});
-        return;
-    }
-    if (password.length < 6) {
-        res.status(400).json({message: 'Password must be at least 6 characters.'});
-        return;
-    }
-
-    // basic email format check
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        res.status(400).json({message: 'Please enter a valid email address.'});
-        return;
-    }
-    
     try {
-        // check for duplicate email, lowercase email for comparison
         const existingUser = await pool.query(
             'SELECT id FROM users WHERE email = $1',
-            [email.toLowerCase()]
+            [email]
         );
         if (existingUser.rows.length > 0) {
             res.status(409).json({message: 'An account with this email already exists.'});
@@ -77,13 +61,12 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
                 `INSERT INTO users (email, password_hash)
                  VALUES ($1, $2)
                  RETURNING id, email, created_at`,
-                 [email.toLowerCase(), password_hash]
+                 [email, password_hash]
             );
             const newUser = userResult.rows[0];
 
-            // create empty profile row for the new user
             await client.query(
-                `INSERT INTO user_profiles (user_id, display_name)
+                `INSERT INTO profiles (user_id, display_name)
                 VALUES ($1, $2)`,
                 [newUser.id, display_name || null]
             );
@@ -116,22 +99,16 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 //   2. Compare password with bcrypt.compare()
 //   3. If match: sign JWT and return { user, token }
 //   4. If no match: return 401 Unauthorized
-router.post('/login', async (req: Request, res: Response): Promise<void> => {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        res.status(400).json({message: 'Email and password are required.'});
-        return;
-    }
+router.post('/login', validate(loginSchema), async (req: Request, res: Response): Promise<void> => {
+    const { email, password } = req.body as LoginInput;
 
     try {
-        // find user by email
         const result = await pool.query(
             `SELECT u.id, u.email, u.password_hash, p.display_name, p.onboarding_completed
             FROM users u
-            LEFT JOIN user_profiles p ON p.user_id = u.id
+            LEFT JOIN profiles p ON p.user_id = u.id
             WHERE u.email = $1`,
-            [email.toLowerCase()]
+            [email]
         );
 
         const user = result.rows[0];
@@ -182,7 +159,7 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
         const result = await pool.query(
             `SELECT u.id, u.email, p.display_name, p.onboarding_completed
             FROM users u
-            LEFT JOIN user_profiles p ON p.user_id = u.id
+            LEFT JOIN profiles p ON p.user_id = u.id
             WHERE u.id = $1`,
             [req.userId]
         );

@@ -12,6 +12,8 @@ import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 import pool from '../db';
 import { requireAuth } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { generateRecipeSchema, GenerateRecipeInput } from '../schemas/generate.schema';
 
 const router = Router();
 router.use(requireAuth);
@@ -86,16 +88,7 @@ async function incrementUsage(userId: string): Promise<void> {
 //   3. Be specific about constraints (time, dietary, allergies)
 //   4. Ask for exactly 3 recipes so you always get a consistent number
 
-function buildPrompt(params: {
-  ingredients: string[];
-  maxTime: number;
-  dietaryStyle?: string;
-  allergies?: string[];
-  skillLevel?: string;
-  cuisines?: string[];
-  goals?: string[];
-  craving?: string;
-}): string {
+function buildPrompt(params: GenerateRecipeInput): string {
   const {
     ingredients,
     maxTime,
@@ -175,28 +168,8 @@ Required format:
 }
 
 // ─── POST /api/generate-recipe ────────────────────────────────────────────────
-router.post('/', async (req: Request, res: Response): Promise<void> => {
-  const {
-    ingredients,
-    maxTime = 30,
-    dietaryStyle,
-    allergies,
-    skillLevel,
-    cuisines,
-    goals,
-    craving,
-  } = req.body;
-
-  // ── Validate input ─────────────────────────────────────────────────────────
-  if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
-    res.status(400).json({ message: 'At least one ingredient is required.' });
-    return;
-  }
-
-  if (ingredients.length > 20) {
-    res.status(400).json({ message: 'Maximum 20 ingredients allowed.' });
-    return;
-  }
+router.post('/', validate(generateRecipeSchema), async (req: Request, res: Response): Promise<void> => {
+  const input = req.body as GenerateRecipeInput;
 
   // ── Check usage limit BEFORE calling OpenAI ────────────────────────────────
   // This is the most important check — we never spend API credits
@@ -222,16 +195,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   // ── Call OpenAI ────────────────────────────────────────────────────────────
   try {
-    const prompt = buildPrompt({
-      ingredients,
-      maxTime,
-      dietaryStyle,
-      allergies,
-      skillLevel,
-      cuisines,
-      goals,
-      craving,
-    });
+    const prompt = buildPrompt(input);
 
     // openai.chat.completions.create() is the main API call.
     // "messages" is an array — you can pass conversation history for multi-turn,

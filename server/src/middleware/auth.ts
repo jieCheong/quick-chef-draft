@@ -56,6 +56,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
         next();
     } catch (error) {
-        res.status(401).json({message: 'Invalid or expired token. Please log in again'});
+        res.status(401).json({message: 'Invalid or expired token. Please log in again.'});
     }
 }
