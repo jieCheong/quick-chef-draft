@@ -1,62 +1,58 @@
 // server/src/middleware/auth.ts
 //
-// requireAuth is a middleware function that protects routes.
-// Any route that needs a logged-in user adds requireAuth before the handler:
+// CHANGE FROM ORIGINAL: after a token verifies successfully, we now
+// also call req.log = req.log.child({ userId }) — this creates a CHILD
+// logger that automatically includes userId on every subsequent log
+// line for this request, without every individual route having to
+// remember to pass userId into req.log.info({ userId }, '...') by hand.
 //
-//   router.get('/profile', requireAuth, async (req, res) => { ... })
-//
-// If the token is missing or invalid → 401 Unauthorized, route never runs.
-// If the token is valid → req.userId and req.userEmail are set, route runs.
-//
-// HOW MIDDLEWARE WORKS IN EXPRESS:
-//   Express processes a request through a chain of functions.
-//   Each function gets (req, res, next).
-//   Calling next() passes control to the next function in the chain.
-//   Not calling next() (and sending a response instead) stops the chain.
-//   That's how we "block" unauthorized requests.
+// req.log only exists because pino-http (wired in app.ts) attaches it
+// to every request BEFORE any route or middleware runs. requireAuth
+// runs after that, so req.log is guaranteed to exist here.
 
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
 
-// extend express's request type to include custom fields
 declare global {
-    // eslint-disable-next-line @typescript-eslint/no-namespace
-    namespace Express{
-        interface Request{
-            userId: string,
-            userEmail: string;
-        }
+  namespace Express {
+    interface Request {
+      userId: string;
+      userEmail: string;
     }
+  }
 }
 
-// shape of data store inside the jwt payload
 interface JwtPayload {
-    userId: string;
-    email: string;
+  userId: string;
+  email: string;
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-    // read the auth header
-    const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        res.status(401).json({message: 'No token provided. Please log in.'});
-        return;
-    }
-    const token = authHeader.split(' ')[1];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ message: 'No token provided. Please log in.' });
+    return;
+  }
 
-    try {
-        // jwt.verify() does two things:
-        // 1. Checks the signature — was this token signed with our JWT_SECRET?
-        // If someone tampers with the payload, the signature won't match → throws.
-        // 2. Checks expiry — is the token still within its 7-day window?
-        // If expired → throws JsonWebTokenError.
-        const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
-        req.userId = payload.userId;
-        req.userEmail = payload.email;
+  const token = authHeader.split(' ')[1];
 
-        next();
-    } catch (error) {
-        res.status(401).json({message: 'Invalid or expired token. Please log in again.'});
-    }
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+
+    req.userId = payload.userId;
+    req.userEmail = payload.email;
+
+    // From this point forward in the request lifecycle, every
+    // req.log.info(...) or req.log.error(...) call — including the
+    // final "request completed" line pino-http logs automatically —
+    // includes userId. This is what makes "show me everything that
+    // happened during this user's failed request" possible to search
+    // for in Railway, instead of only having an anonymous request id.
+    req.log = req.log.child({ userId: payload.userId });
+
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Invalid or expired token. Please log in again.' });
+  }
 }

@@ -6,8 +6,10 @@ import { requireAuth } from '../auth';
 vi.mock('jsonwebtoken');
 
 function mockRequest(authHeader?: string): Request {
+  const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), child: vi.fn().mockReturnThis() };
   return {
     headers: { authorization: authHeader },
+    log,
   } as unknown as Request;
 }
 
