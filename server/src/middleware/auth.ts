@@ -20,6 +20,7 @@ import jwt from 'jsonwebtoken'
 
 // extend express's request type to include custom fields
 declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace Express{
         interface Request{
             userId: string,

@@ -29,7 +29,7 @@ export function validate(schema: ZodSchema, target: ValidationTarget = 'body') {
       // Overwrite req[target] with the parsed/coerced version.
       // This means route handlers receive clean, typed data —
       // they never need to re-validate or guess about shape.
-      (req as any)[target] = parsed;
+      (req as unknown as Record<string, unknown>)[target] = parsed;
 
       next();
     } catch (error) {
