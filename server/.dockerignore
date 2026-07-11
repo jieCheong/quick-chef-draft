@@ -1,0 +1,36 @@
+# server/.dockerignore
+#
+# Tells Docker which files to exclude when copying into the image.
+# Works exactly like .gitignore but for Docker's COPY instruction.
+#
+# WHY THIS MATTERS:
+# Without .dockerignore, "COPY . ." in the Dockerfile copies EVERYTHING
+# including node_modules (potentially hundreds of MB), .env files with
+# real secrets, and test files that don't belong in a production image.
+# .dockerignore keeps the build context small (faster builds) and the
+# image clean (no accidentally leaked secrets).
+
+# Dependencies — these get reinstalled inside the container via npm ci.
+# Never copy host node_modules into an image — platform-specific binaries
+# compiled on your Windows machine won't run on the Alpine Linux container.
+node_modules/
+
+# Compiled output — the builder stage compiles fresh inside the container.
+dist/
+
+# Environment files — secrets must come from environment variables
+# injected at runtime (docker-compose, Railway, etc), never baked
+# into the image itself. An image with a real .env could be pushed
+# to a registry and expose credentials to anyone who pulls it.
+.env
+.env.*
+
+# Test files — don't belong in a production image.
+# Tests run in CI (GitHub Actions), not inside the deployed container.
+src/**/__tests__/
+src/**/*.test.ts
+vitest.config.ts
+
+# Development-only files
+*.md
+.gitignore

@@ -19,10 +19,19 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // create the pool. reads DATABASE_URL from process.env.
+//
+// ssl is derived from DATABASE_URL itself rather than hardcoded or keyed
+// off NODE_ENV: Neon's connection string always carries ?sslmode=require
+// (it rejects plain connections), but the local docker-compose Postgres
+// (postgresql://postgres:postgres@db:5432/quickchef) has no SSL support
+// at all — requesting SSL against it fails with "The server does not
+// support SSL connections". Reading the flag off the URL means the same
+// code works against both without needing an extra env var to keep in sync.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // ssl tells the pg driver to use ssl but not verify the certificate
-  ssl: { rejectUnauthorized: false },
+  ssl: process.env.DATABASE_URL?.includes('sslmode=require')
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
 // test the connection when module loads

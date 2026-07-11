@@ -1,0 +1,144 @@
+# docker-compose.yml
+# Lives at the project root (next to package.json, not inside server/).
+#
+# Defines two services that run together as one local environment:
+#   db      — PostgreSQL 16
+#   server  — your Express API
+#
+# Usage:
+#   docker-compose up --build    ← first time, or after code changes
+#   docker-compose up            ← subsequent runs (uses cached image)
+#   docker-compose down          ← stop and remove containers
+#   docker-compose down -v       ← also remove the postgres data volume
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    # Container name makes it easy to reference in other docker commands:
+    #   docker exec -it quickchef-db psql -U postgres quickchef
+    container_name: quickchef-db
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: quickchef
+
+    ports:
+      # HOST:CONTAINER — exposes the container's port 5432 on host port
+      # 5433 so you can connect from a local GUI (TablePlus, pgAdmin) or
+      # psql. Mapped to 5433 instead of 5432 because another project's
+      # postgres container may already be bound to 5432 on this machine —
+      # inside the Docker network the "server" service still reaches this
+      # one at db:5432 regardless of the host-side port here.
+      - "5433:5432"
+
+    volumes:
+      # Named volume: persists postgres data between container restarts.
+      # Without this, ALL your data is deleted every time you run
+      # "docker-compose down" — the volume keeps it across restarts.
+      - quickchef_postgres_data:/var/lib/postgresql/data
+
+      # Init script: postgres automatically runs any .sql file in this
+      # directory when the container starts for the FIRST TIME (when the
+      # data volume is empty). This is how your schema gets created
+      # automatically — no manual "run schema.sql" step needed.
+      - ./server/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+
+    # Health check: docker-compose waits for postgres to actually accept
+    # connections before starting the server container. Without this,
+    # the server might try to connect before postgres is ready, fail,
+    # and exit — even though postgres would have been ready 2 seconds later.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d quickchef"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Express Server ──────────────────────────────────────────────────────────
+  server:
+    # Build from the Dockerfile in server/ rather than pulling a pre-built image.
+    # "context: server" means the Dockerfile and all files it copies come
+    # from the server/ directory.
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: quickchef-server
+
+    # HOST:CONTAINER — mapped to host port 3002 instead of 3001 because
+    # another project's container may already be bound to 3001 on this
+    # machine. The server still listens on 3001 *inside* the container
+    # (PORT below, and Dockerfile's EXPOSE) — only the host-side port
+    # changes, so hit http://localhost:3002 from outside Docker.
+    ports:
+      - "3002:3001"
+
+    # Loads every var from server/.env into the container first (that's
+    # where OPENAI_API_KEY already lives — no export, no --env-file flag
+    # needed). The environment: block below is applied AFTER env_file and
+    # wins on any key collision, which is what overrides DATABASE_URL,
+    # JWT_SECRET, PORT, and CORS_ORIGIN below with docker-network-correct
+    # values instead of the ones meant for local (non-docker) dev.
+    env_file:
+      - ./server/.env
+
+    environment:
+      # NOT "development" — the Dockerfile builds a real two-stage
+      # production image (npm ci --omit=dev in the "production" stage),
+      # which never installs pino-pretty since it's a devDependency.
+      # logger.ts only tries to load pino-pretty when NODE_ENV isn't
+      # "production" — setting this to "development" here crashes the
+      # container on boot with "unable to determine transport target for
+      # pino-pretty" the moment the first log line is written, because
+      # the module genuinely isn't in the image. The Dockerfile's own
+      # production stage already bakes in NODE_ENV=production; this just
+      # keeps compose from overriding that with a value the image can't
+      # actually support.
+      NODE_ENV: production
+      PORT: 3001
+
+      # DATABASE_URL points to the "db" service by its service name.
+      # Inside the Docker network, containers reach each other by service name
+      # — "db" resolves to the postgres container's IP automatically.
+      # This is why you use "db" here instead of "localhost": localhost
+      # inside the server container refers to the server container itself,
+      # not the postgres container.
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/quickchef
+
+      # JWT_SECRET is intentionally hardcoded here rather than pulled from
+      # server/.env — that keeps the docker-compose stack self-contained
+      # even if server/.env's value ever changes.
+      JWT_SECRET: local-dev-jwt-secret-replace-in-production
+      CORS_ORIGIN: http://localhost:5173
+
+      # OPENAI_API_KEY is NOT set here on purpose — it comes from the
+      # env_file above (server/.env), so it stays in one place instead of
+      # needing to be copy-pasted into a second file.
+
+    # depends_on with condition ensures the server only starts AFTER
+    # postgres passes its health check — not just after the container
+    # starts (which happens before postgres is ready to accept connections).
+    depends_on:
+      db:
+        condition: service_healthy
+
+    # NOT currently live-reload — this mount is inert today. The
+    # production stage of the Dockerfile never COPYs src/ into the image
+    # (only package*.json and the pre-compiled dist/ from the builder
+    # stage), and CMD runs `node dist/index.js` directly — nothing in the
+    # running container ever reads /app/src, mounted or not. Code changes
+    # only take effect via `docker-compose up --build`, which recompiles
+    # dist/ inside the image.
+    #
+    # This mount is left in place as a placeholder: it would only start
+    # doing something if a dev-oriented stage/CMD is added later that
+    # runs ts-node-dev against the mounted src/ instead of the compiled
+    # dist/ — at that point this line becomes real hot-reload.
+    volumes:
+      - ./server/src:/app/src
+
+# Named volumes are managed by Docker and persist between "docker-compose down"
+# restarts. "docker-compose down -v" removes them (full reset including data).
+volumes:
+  quickchef_postgres_data:
