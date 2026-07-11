@@ -88,11 +88,14 @@ describe('POST /api/generate-recipe', () => {
   });
 
   it('allows generation when usage is under the daily limit', async () => {
-    // First pool.query call inside the route is checkUsageLimit's SELECT.
-    // No row found = user hasn't generated today yet (used: 0, max: 2).
-    vi.mocked(pool.query)
-      .mockResolvedValueOnce({ rows: [] } as never) // checkUsageLimit SELECT
-      .mockResolvedValueOnce({ rows: [] } as never); // incrementUsage INSERT..ON CONFLICT
+    // The route now does ONE atomic reserve-and-increment query (an
+    // INSERT..ON CONFLICT DO UPDATE..WHERE..RETURNING), not a separate
+    // check then a separate increment. RETURNING a row means the
+    // reservation succeeded — used: 1 reflects this request's own
+    // increment (first generation of the day for this user).
+    vi.mocked(pool.query).mockResolvedValueOnce({
+      rows: [{ generations_used: 1, max_generations: 2 }],
+    } as never); // reserveGenerationSlot INSERT..ON CONFLICT..RETURNING
 
     mockCreate.mockResolvedValue(FAKE_OPENAI_RESPONSE as never);
 
@@ -105,14 +108,22 @@ describe('POST /api/generate-recipe', () => {
     expect(res.body.recipes).toHaveLength(1);
     expect(res.body.recipes[0].title).toBe('Garlic Butter Chicken');
     expect(res.body.usage).toEqual({ used: 1, max: 2, remaining: 1 });
+
+    // Exactly one query for the whole usage check+reserve — proves
+    // there's no separate increment call left over from the old flow.
+    expect(pool.query).toHaveBeenCalledTimes(1);
   });
 
   it('returns 429 and NEVER calls OpenAI when the user is already at the daily limit', async () => {
-    // Simulate a usage_daily row showing the user already used both
-    // of their 2 free generations today.
-    vi.mocked(pool.query).mockResolvedValueOnce({
-      rows: [{ generations_used: 2, max_generations: 2 }],
-    } as never);
+    // RETURNING zero rows is how reserveGenerationSlot signals "already
+    // at limit" — the DO UPDATE's WHERE clause failed, so ON CONFLICT
+    // behaved as DO NOTHING. The route then falls back to a plain
+    // SELECT (currentUsage) just to report the numbers in the 429 body.
+    vi.mocked(pool.query)
+      .mockResolvedValueOnce({ rows: [] } as never) // reserveGenerationSlot: 0 rows = at limit
+      .mockResolvedValueOnce({
+        rows: [{ generations_used: 2, max_generations: 2 }],
+      } as never); // currentUsage SELECT for the error message
 
     const res = await request(app)
       .post('/api/generate-recipe')
@@ -131,6 +142,32 @@ describe('POST /api/generate-recipe', () => {
     // every status-code assertion but silently burn API credits —
     // this line is what catches that specific bug.
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('releases the reserved slot when OpenAI fails, so a failed attempt does not cost the user a generation', async () => {
+    vi.mocked(pool.query)
+      .mockResolvedValueOnce({
+        rows: [{ generations_used: 1, max_generations: 2 }],
+      } as never) // reserveGenerationSlot succeeds
+      .mockResolvedValueOnce({ rows: [] } as never); // releaseGenerationSlot UPDATE
+
+    // status: 400 is deliberately NOT retryable (see isRetryableOpenAIError)
+    // so this fails on the first attempt instead of waiting through
+    // retryWithBackoff's exponential delays.
+    mockCreate.mockRejectedValue(Object.assign(new Error('OpenAI down'), { status: 400 }) as never);
+
+    const res = await request(app)
+      .post('/api/generate-recipe')
+      .set('Authorization', 'Bearer fake.token.here')
+      .send({ ingredients: ['rice'], maxTime: 30 });
+
+    expect(res.status).toBe(500);
+
+    // The 2nd+3rd queries are the retryWithBackoff attempts hitting
+    // OpenAI (mocked, not real pool.query calls) — the 2nd pool.query
+    // call is specifically the release UPDATE, proven by its SQL text.
+    const [releaseSql] = vi.mocked(pool.query).mock.calls[1];
+    expect(releaseSql).toContain('generations_used = GREATEST(generations_used - 1, 0)');
   });
 
   it('rejects requests with no ingredients before reaching the database', async () => {
@@ -161,7 +198,11 @@ describe('POST /api/generate-recipe', () => {
   });
 
   it('returns 500 gracefully when OpenAI returns malformed JSON', async () => {
-    vi.mocked(pool.query).mockResolvedValueOnce({ rows: [] } as never);
+    vi.mocked(pool.query)
+      .mockResolvedValueOnce({
+        rows: [{ generations_used: 1, max_generations: 2 }],
+      } as never) // reserveGenerationSlot succeeds
+      .mockResolvedValueOnce({ rows: [] } as never); // releaseGenerationSlot UPDATE, since parsing fails after reserving
 
     mockCreate.mockResolvedValue({
       choices: [{ message: { content: 'this is not valid json at all' } }],

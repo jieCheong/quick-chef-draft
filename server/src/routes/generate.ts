@@ -30,24 +30,63 @@ function getOpenAI(): OpenAI {
   return _openai;
 }
 
-async function checkUsageLimit(userId: string): Promise<{ allowed: boolean; used: number; max: number }> {
+type Reservation = { reserved: true; used: number; max: number } | { reserved: false };
+
+// Atomically checks AND reserves a generation slot in one statement. The
+// WHERE clause on DO UPDATE means the row is only touched — and RETURNING
+// only yields a row — when the user is still under their limit; if they're
+// already at max, ON CONFLICT DO UPDATE ... WHERE <false> behaves as DO
+// NOTHING and RETURNING yields zero rows.
+//
+// WHY THIS REPLACES A SEPARATE "SELECT then INSERT/UPDATE" PAIR:
+// A read-then-write pattern (check usage, later increment after OpenAI
+// succeeds) has a gap between the two steps. Under concurrent requests,
+// many of them can all read "under limit" before any of them finishes
+// incrementing — every one of those requests then proceeds to call
+// OpenAI. A k6 load test against this exact route reproduced it directly:
+// 10 real OpenAI calls fired against a 2/day cap. Folding the check and
+// the increment into a single atomic statement closes that gap — Postgres
+// serializes concurrent INSERT..ON CONFLICT attempts on the same row via
+// its own row-level locking, so only `max_generations` reservations can
+// ever succeed for a given user+date, no matter how many requests race.
+async function reserveGenerationSlot(userId: string): Promise<Reservation> {
+  const today = new Date().toISOString().split('T')[0];
+  const result = await pool.query(
+    `INSERT INTO usage_daily (user_id, date, generations_used, max_generations)
+     VALUES ($1, $2, 1, 2)
+     ON CONFLICT (user_id, date)
+     DO UPDATE SET generations_used = usage_daily.generations_used + 1, updated_at = NOW()
+     WHERE usage_daily.generations_used < usage_daily.max_generations
+     RETURNING generations_used, max_generations`,
+    [userId, today]
+  );
+  if (result.rows.length === 0) return { reserved: false };
+  const { generations_used, max_generations } = result.rows[0];
+  return { reserved: true, used: generations_used, max: max_generations };
+}
+
+// Only used for the 429 response body — the reservation attempt itself
+// already knows it failed, but not the current used/max to report back.
+async function currentUsage(userId: string): Promise<{ used: number; max: number }> {
   const today = new Date().toISOString().split('T')[0];
   const result = await pool.query(
     `SELECT generations_used, max_generations FROM usage_daily WHERE user_id = $1 AND date = $2`,
     [userId, today]
   );
-  if (result.rows.length === 0) return { allowed: true, used: 0, max: 2 };
+  if (result.rows.length === 0) return { used: 0, max: 2 };
   const { generations_used, max_generations } = result.rows[0];
-  return { allowed: generations_used < max_generations, used: generations_used, max: max_generations };
+  return { used: generations_used, max: max_generations };
 }
 
-async function incrementUsage(userId: string): Promise<void> {
+// Gives a reserved slot back when the OpenAI call it was reserved for
+// ends up failing — a failed generation shouldn't count against the
+// user's daily quota.
+async function releaseGenerationSlot(userId: string): Promise<void> {
   const today = new Date().toISOString().split('T')[0];
   await pool.query(
-    `INSERT INTO usage_daily (user_id, date, generations_used, max_generations)
-     VALUES ($1, $2, 1, 2)
-     ON CONFLICT (user_id, date)
-     DO UPDATE SET generations_used = usage_daily.generations_used + 1, updated_at = NOW()`,
+    `UPDATE usage_daily
+     SET generations_used = GREATEST(generations_used - 1, 0), updated_at = NOW()
+     WHERE user_id = $1 AND date = $2`,
     [userId, today]
   );
 }
@@ -113,9 +152,9 @@ Required format:
 router.post('/', validate(generateRecipeSchema), async (req: Request, res: Response): Promise<void> => {
   const input = req.body as GenerateRecipeInput;
 
-  let usage;
+  let reservation: Reservation;
   try {
-    usage = await checkUsageLimit(req.userId);
+    reservation = await reserveGenerationSlot(req.userId);
   } catch (error) {
     // req.log.error's first argument is an OBJECT, not a string —
     // this is the core difference from console.error. Pino merges this
@@ -128,7 +167,9 @@ router.post('/', validate(generateRecipeSchema), async (req: Request, res: Respo
     return;
   }
 
-  if (!usage.allowed) {
+  if (!reservation.reserved) {
+    const usage = await currentUsage(req.userId).catch(() => ({ used: 2, max: 2 }));
+
     // Logging the rate-limit hit itself (at warn, not error — this is
     // expected product behavior, not a bug) means you can later answer
     // "how often are free users actually hitting the 2/day wall?" by
@@ -183,8 +224,10 @@ router.post('/', validate(generateRecipeSchema), async (req: Request, res: Respo
       throw new Error('AI returned no recipes. Please try again.');
     }
 
-    await incrementUsage(req.userId);
-
+    // No increment here — the slot was already reserved atomically
+    // before the OpenAI call. reservation.used/max reflect the count
+    // AFTER this request's reservation, same numbers the old post-hoc
+    // increment would have produced on the happy path.
     req.log.info(
       { ingredientCount: input.ingredients.length, recipeCount: parsed.recipes.length },
       'Recipe generation succeeded'
@@ -192,9 +235,16 @@ router.post('/', validate(generateRecipeSchema), async (req: Request, res: Respo
 
     res.json({
       recipes: parsed.recipes,
-      usage: { used: usage.used + 1, max: usage.max, remaining: usage.max - usage.used - 1 },
+      usage: { used: reservation.used, max: reservation.max, remaining: reservation.max - reservation.used },
     });
   } catch (error) {
+    // The reservation succeeded but the generation itself failed —
+    // give the slot back so a failed attempt doesn't cost the user
+    // one of their limited daily generations.
+    await releaseGenerationSlot(req.userId).catch((releaseError) => {
+      req.log.error({ err: releaseError }, 'Failed to release usage slot after generation failure');
+    });
+
     // err is logged as its own field (not string-concatenated into the
     // message) so Pino preserves the full stack trace as structured
     // data — visible and expandable in Railway's log viewer, rather
