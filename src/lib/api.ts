@@ -39,4 +39,9 @@ export async function apiFetch<T = unknown>(
         method: 'PATCH',
         body: JSON.stringify(body)
     });
+ export const apiPut = <T = unknown>(path: string, body: unknown) =>
+    apiFetch<T>(path, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+    });
  export const apiDelete = <T = unknown>(path: string) => apiFetch<T>(path, { method: 'DELETE' });

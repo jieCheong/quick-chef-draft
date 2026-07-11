@@ -66,7 +66,7 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
             const newUser = userResult.rows[0];
 
             await client.query(
-                `INSERT INTO profiles (user_id, display_name)
+                `INSERT INTO user_profiles (user_id, display_name)
                 VALUES ($1, $2)`,
                 [newUser.id, display_name || null]
             );

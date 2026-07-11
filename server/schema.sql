@@ -98,6 +98,31 @@ CREATE TABLE IF NOT EXISTS usage_daily (
     UNIQUE(user_id, date)
 );
 
+-- Monthly Budgets table
+-- One row per user per calendar month, holding the grocery budget amount they set
+CREATE TABLE IF NOT EXISTS monthly_budgets (
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    month          INT NOT NULL,
+    year           INT NOT NULL,
+    budget_amount  NUMERIC(10,2) NOT NULL,
+    created_at     TIMESTAMPTZ DEFAULT NOW(),
+    updated_at     TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, month, year)
+);
+
+-- Budget Transactions table
+-- Individual grocery purchases logged against a monthly budget
+CREATE TABLE IF NOT EXISTS budget_transactions (
+    id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    budget_id         UUID NOT NULL REFERENCES monthly_budgets(id) ON DELETE CASCADE,
+    amount            NUMERIC(10,2) NOT NULL,
+    description       TEXT,
+    transaction_date  TIMESTAMPTZ DEFAULT NOW(),
+    created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
 --Viral Recipes
 -- These are not user generated, I add them manually in the Neon db
 -- The week_start / week_end + active columns let me:
@@ -127,6 +152,9 @@ CREATE INDEX IF NOT EXISTS idx_saved_recipes_user_id ON saved_recipes(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_daily_user_id ON usage_daily(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_daily_date ON usage_daily(date);
 CREATE INDEX IF NOT EXISTS idx_viral_recipes_active ON viral_recipes(active);
+CREATE INDEX IF NOT EXISTS idx_monthly_budgets_user_id ON monthly_budgets(user_id);
+CREATE INDEX IF NOT EXISTS idx_budget_transactions_user_id ON budget_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_budget_transactions_budget_id ON budget_transactions(budget_id);
 
 -- Auto update updated_at column on row update
 -- PostgreSQL doesn't automatically update "updated_at" when row changes
@@ -152,4 +180,8 @@ FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE OR REPLACE TRIGGER update_usage_daily_updated_at
 BEFORE UPDATE ON usage_daily
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE OR REPLACE TRIGGER update_monthly_budgets_updated_at
+BEFORE UPDATE ON monthly_budgets
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

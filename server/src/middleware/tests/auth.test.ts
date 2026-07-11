@@ -113,7 +113,7 @@ describe('POST /api/auth/register', () => {
     // in the right order, and that it was committed rather than left open.
     expect(client.query).toHaveBeenNthCalledWith(1, 'BEGIN');
     expect(client.query.mock.calls[1][0]).toContain('INSERT INTO users');
-    expect(client.query.mock.calls[2][0]).toContain('INSERT INTO profiles');
+    expect(client.query.mock.calls[2][0]).toContain('INSERT INTO user_profiles');
     expect(client.query).toHaveBeenNthCalledWith(4, 'COMMIT');
 
     // The client must always be released back to the pool, success or not —

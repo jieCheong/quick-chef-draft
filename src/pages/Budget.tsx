@@ -11,13 +11,14 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GoalBadge } from '@/components/ui/goal-badge';
 import { useToast } from '@/hooks/use-toast';
+import { apiGet, apiPut, apiPost } from '@/lib/api';
 
-import { 
-  DollarSign, Target, Plus, TrendingUp, TrendingDown, 
+import {
+  DollarSign, Target, Plus, TrendingUp, TrendingDown,
   Sparkles, Loader2, Check, ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type MonthlyBudget, type BudgetTransaction } from '@/types/database';
+import { type MonthlyBudget, type BudgetTransaction, type BudgetRecommendation } from '@/types/database';
 
 export default function Budget() {
   const navigate = useNavigate();
@@ -33,9 +34,8 @@ export default function Budget() {
   const [transactionAmount, setTransactionAmount] = useState('');
   const [transactionDesc, setTransactionDesc] = useState('');
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
-
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
+  const [recommendations, setRecommendations] = useState<BudgetRecommendation[] | null>(null);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -50,56 +50,63 @@ export default function Budget() {
   }, [user]);
 
   const fetchBudgetData = async () => {
-    // TODO: connect to backend
-    setIsLoading(false);
+    setIsLoading(true);
+    try {
+      const data = await apiGet<{ budget: MonthlyBudget | null; transactions: BudgetTransaction[] }>('/api/budget');
+      setBudget(data.budget);
+      setTransactions(data.transactions);
+    } catch {
+      toast({ variant: 'destructive', description: 'Failed to load budget.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const saveBudget = async () => {
-    if (!user || !budgetAmount) return;
+    if (!budgetAmount) return;
     setIsSaving(true);
-    // TODO: connect to backend — update locally for now
-    const amount = parseFloat(budgetAmount);
-    if (budget) {
-      setBudget({ ...budget, budget_amount: amount });
-      toast({ description: 'Budget updated!' });
-    } else {
-      setBudget({
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        month: currentMonth,
-        year: currentYear,
-        budget_amount: amount,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as MonthlyBudget);
-      toast({ description: 'Budget set!' });
+    try {
+      const amount = parseFloat(budgetAmount);
+      const data = await apiPut<{ budget: MonthlyBudget }>('/api/budget', { budget_amount: amount });
+      setBudget(data.budget);
+      setBudgetAmount('');
+      toast({ description: budget ? 'Budget updated!' : 'Budget set!' });
+    } catch (err) {
+      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Failed to save budget.' });
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const addTransaction = async () => {
-    if (!user || !budget || !transactionAmount) return;
+    if (!budget || !transactionAmount) return;
     setIsAddingTransaction(true);
-    // TODO: connect to backend — add locally for now
-    const newTransaction: BudgetTransaction = {
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      budget_id: budget.id,
-      amount: parseFloat(transactionAmount),
-      description: transactionDesc || 'Grocery purchase',
-      transaction_date: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    } as BudgetTransaction;
-    setTransactions([newTransaction, ...transactions]);
-    setTransactionAmount('');
-    setTransactionDesc('');
-    toast({ description: 'Purchase logged!' });
-    setIsAddingTransaction(false);
+    try {
+      const newTransaction = await apiPost<BudgetTransaction>('/api/budget/transactions', {
+        amount: parseFloat(transactionAmount),
+        description: transactionDesc || undefined,
+      });
+      setTransactions([newTransaction, ...transactions]);
+      setTransactionAmount('');
+      setTransactionDesc('');
+      toast({ description: 'Purchase logged!' });
+    } catch (err) {
+      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Failed to log purchase.' });
+    } finally {
+      setIsAddingTransaction(false);
+    }
   };
 
   const getRecommendations = async () => {
-    // TODO: connect to backend
-    toast({ description: 'AI recommendations coming soon' });
+    setIsLoadingRecommendations(true);
+    try {
+      const data = await apiPost<{ recommendations: BudgetRecommendation[] }>('/api/budget/recommendations', {});
+      setRecommendations(data.recommendations);
+    } catch (err) {
+      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Failed to get recommendations.' });
+    } finally {
+      setIsLoadingRecommendations(false);
+    }
   };
 
   const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
@@ -217,15 +224,34 @@ export default function Budget() {
               </CardTitle>
               <CardDescription>Ingredients that fit your budget and goals</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <Button
                 variant="outline"
                 className="w-full"
                 onClick={getRecommendations}
+                disabled={isLoadingRecommendations}
               >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Get Recommendations
+                {isLoadingRecommendations ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                {recommendations ? 'Refresh Recommendations' : 'Get Recommendations'}
               </Button>
+
+              {recommendations && (
+                <div className="space-y-3 pt-1">
+                  {recommendations.map((rec, i) => (
+                    <div key={i} className="rounded-lg border p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">{rec.category}</span>
+                        <span className="text-sm text-muted-foreground">${Number(rec.estimated_cost).toFixed(2)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{rec.items.join(', ')}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

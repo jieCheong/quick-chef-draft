@@ -10,6 +10,7 @@ import pantryRouter from './routes/pantry';
 import recipesRouter from './routes/recipes';
 import generateRouter from './routes/generate';
 import viralRouter from './routes/viral';
+import budgetRouter from './routes/budget';
 
 export function buildApp(): Express {
   const app = express();
@@ -67,6 +68,7 @@ export function buildApp(): Express {
   app.use('/api/recipes', recipesRouter);
   app.use('/api/generate-recipe', generateRouter);
   app.use('/api/viral-recipes', viralRouter);
+  app.use('/api/budget', budgetRouter);
 
   app.use((_req, res) => {
     res.status(404).json({ message: 'Route not found' });

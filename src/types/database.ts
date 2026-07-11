@@ -91,6 +91,12 @@ export interface BudgetTransaction {
   created_at: string;
 }
 
+export interface BudgetRecommendation {
+  category: string;
+  items: string[];
+  estimated_cost: number;
+}
+
 export const DIETARY_STYLES: { value: DietaryStyle; label: string }[] = [
   { value: 'omnivore', label: 'Omnivore' },
   { value: 'vegetarian', label: 'Vegetarian' },
