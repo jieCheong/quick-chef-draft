@@ -1,6 +1,8 @@
 import {Router, Request, Response} from 'express';
 import pool from '../db';
 import {requireAuth} from '../middleware/auth';
+import {validate} from '../middleware/validate';
+import {updateProfileSchema} from '../schemas/profile.schema';
 
 const router = Router();
 
@@ -44,7 +46,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     }
 });
 // PATH
-router.patch('/', async (req: Request, res: Response):
+router.patch('/', validate(updateProfileSchema), async (req: Request, res: Response):
 Promise<void> => {
     const ALLOWED_FIELDS = [
         'display_name',

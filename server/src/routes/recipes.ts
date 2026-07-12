@@ -1,6 +1,8 @@
 import {Router, Request, Response} from 'express';
 import pool from '../db';
 import { requireAuth} from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { idParamSchema } from '../schemas/recipes.schema';
 
 const router = Router();
 router.use(requireAuth);
@@ -78,7 +80,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 // delete
-router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+router.delete('/:id', validate(idParamSchema, 'params'), async (req: Request, res: Response): Promise<void> => {
     const {id} = req.params;
 
     try {

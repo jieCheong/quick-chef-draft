@@ -5,6 +5,8 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db';
 import { requireAuth } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { addPantryItemSchema, idParamSchema, AddPantryItemInput } from '../schemas/pantry.schema';
 
 const router = Router();
 router.use(requireAuth);
@@ -27,20 +29,16 @@ router.get('/', async(req: Request, res: Response): Promise<void> => {
 });
 
 // post
-router.post('/', async (req: Request, res: Response): Promise<void> => {
-    const {name, category = 'other'} = req.body;
+router.post('/', validate(addPantryItemSchema), async (req: Request, res: Response): Promise<void> => {
+    const {name, category} = req.body as AddPantryItemInput;
 
-    if (!name || !name.trim()) {
-        res.status(400).json({message: 'Item name is required.'});
-        return;
-    }
     try {
         // check for duplicates - no point adding "Chicken" twice
         // LOWER() makes the check case-insensitive
         const existing = await pool.query(
             `SELECT id FROM pantry_items
             WHERE user_id = $1 AND LOWER(name) = LOWER($2)`,
-            [req.userId, name.trim()]
+            [req.userId, name]
         );
         if (existing.rows.length > 0) {
             res.status(409).json({message: `"${name}" is already in your pantry.`});
@@ -50,7 +48,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             `INSERT INTO pantry_items (user_id, name, category)
             VALUES ($1, $2, $3)
             RETURNING id, user_id, name, category, created_at`,
-            [req.userId, name.trim(), category]
+            [req.userId, name, category]
         );
         res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -60,7 +58,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 // delete
-router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+router.delete('/:id', validate(idParamSchema, 'params'), async (req: Request, res: Response): Promise<void> => {
     const {id} = req.params;
 
     try {
