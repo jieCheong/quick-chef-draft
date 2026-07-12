@@ -106,7 +106,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
         const result = await pool.query(
             `SELECT u.id, u.email, u.password_hash, p.display_name, p.onboarding_completed
             FROM users u
-            LEFT JOIN profiles p ON p.user_id = u.id
+            LEFT JOIN user_profiles p ON p.user_id = u.id
             WHERE u.email = $1`,
             [email]
         );
@@ -159,7 +159,7 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
         const result = await pool.query(
             `SELECT u.id, u.email, p.display_name, p.onboarding_completed
             FROM users u
-            LEFT JOIN profiles p ON p.user_id = u.id
+            LEFT JOIN user_profiles p ON p.user_id = u.id
             WHERE u.id = $1`,
             [req.userId]
         );
