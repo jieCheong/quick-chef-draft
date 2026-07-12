@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { QuickBadge } from '@/components/ui/quick-badge';
 import { GoalBadge } from '@/components/ui/goal-badge';
 import { apiGet } from '@/lib/api';
-import { ChefHat, Zap, Clock, Flame, Bookmark, TrendingUp, ArrowRight } from 'lucide-react';
+import { ChefHat, Clock, Flame, Bookmark, ArrowRight } from 'lucide-react';
 import type { SavedRecipe } from '@/types/database';
 
 interface ViralRecipe {
@@ -110,36 +110,11 @@ export default function Home() {
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">What should I cook?
                 </h3>
-                <p className="text-sm opacity-90">Get AI-powered recipe suggestions</p>
+                <p className="text-sm opacity-90">Get AI-powered quick recipe generation</p>
                 </div>
                 <ArrowRight className="h-5 w-5" />
               </CardContent>
             </Card>
-
-        {/* Quick Meals Section */}
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-quick fill-quick" />
-            <h2 className="font-semibold">Quick Meals</h2>
-            <QuickBadge size="sm" />
-          </div>
-
-          <Card className="bg-gradient-to-br from-quick/10 to-primary/5 border-quick/20">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground mb-3">
-                Need something fast? Get recipes ready in under 15 minutes.
-              </p>
-              <Button 
-                size="sm" 
-                onClick={() => navigate('/cook?quick=true')}
-                className="bg-quick text-quick-foreground hover:bg-quick/90"
-              >
-                Find Quick Meals
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
 
         {/* Viral Recipes - Trending this week */}
         <section className="space-y-3">
