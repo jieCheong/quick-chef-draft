@@ -1,16 +1,15 @@
 # .github/workflows/ci.yml
 #
-# Runs on every push and every pull request targeting main or
-# rebuild/own-backend. Three independent jobs: lint, typecheck, test.
+# Four independent jobs running in parallel on every push and PR.
+# Added from Day 18: lint, typecheck, test.
+# Added now: audit (dependency vulnerability scan).
 #
-# WHY SEPARATE JOBS INSTEAD OF ONE JOB RUNNING EVERYTHING SEQUENTIALLY:
-# GitHub Actions runs independent jobs in PARALLEL by default, on
-# separate runners. A typecheck failure and a lint failure surface as
-# two distinct red X's instead of one job stopping at the first error
-# and hiding whether the second check would have also failed. For a
-# resume/portfolio repo, this also means the Actions tab visibly shows
-# three named checks — "lint", "typecheck", "test" — which reads as
-# more deliberate engineering than a single opaque "build" job.
+# WHY A SEPARATE AUDIT JOB INSTEAD OF ADDING IT TO AN EXISTING JOB:
+# Audit failures are a different category from code failures — a broken
+# test means your logic is wrong, a high-severity vulnerability means
+# a dependency needs updating. Keeping them separate means a vulnerable
+# dependency shows up as its own named red X ("audit") in GitHub's UI,
+# not hidden inside a failing "test" job where someone might miss it.
 
 name: CI
 
@@ -21,7 +20,7 @@ on:
     branches: [main, rebuild/own-backend]
 
 jobs:
-  # ── Job 1: Lint the frontend ────────────────────────────────────────────────
+  # ── Job 1: Lint ─────────────────────────────────────────────────────────────
   lint:
     name: Lint (frontend)
     runs-on: ubuntu-latest
@@ -39,7 +38,7 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
-  # ── Job 2: Typecheck both frontend and server ───────────────────────────────
+  # ── Job 2: Typecheck ────────────────────────────────────────────────────────
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
@@ -54,12 +53,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # tsc --noEmit compiles without writing any .js output files —
-      # we only want the type-checking side effect (pass/fail), not
-      # an actual build artifact. The frontend tsconfig is already
-      # configured for this; we're just invoking it directly via npx
-      # rather than through a custom package.json script, since
-      # "typecheck" isn't one of QuickChef's existing scripts.
       - name: Typecheck frontend
         run: npx tsc --noEmit
 
@@ -71,7 +64,7 @@ jobs:
         working-directory: ./server
         run: npx tsc --noEmit
 
-  # ── Job 3: Run server test suite ────────────────────────────────────────────
+  # ── Job 3: Test ─────────────────────────────────────────────────────────────
   test:
     name: Test (server)
     runs-on: ubuntu-latest
@@ -82,22 +75,51 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          # cache-dependency-path matters here because the server has
-          # its OWN package-lock.json, separate from the root one.
-          # Without this, setup-node would only cache based on the
-          # root lockfile and miss caching server/node_modules.
           cache-dependency-path: server/package-lock.json
 
       - name: Install server dependencies
         working-directory: ./server
         run: npm ci
 
-      # No DATABASE_URL, JWT_SECRET, or OPENAI_API_KEY needed here —
-      # the entire test suite mocks pg, openai, and jsonwebtoken at
-      # the module level (see Day 16/17 test files). This is precisely
-      # why those tests were written to mock external dependencies:
-      # CI has no database, no real OpenAI credits to spend, and no
-      # production secrets, and the suite still runs end to end.
       - name: Run tests
         working-directory: ./server
         run: npm test
+
+  # ── Job 4: Security audit ───────────────────────────────────────────────────
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── Frontend audit ──────────────────────────────────────────────────────
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Audit frontend dependencies
+        # --audit-level=high means the job only FAILS on high or critical
+        # severity vulnerabilities. Low and moderate are reported but don't
+        # break the build — those are typically transitive dependencies with
+        # no realistic exploit path and fixing them would require breaking
+        # upstream changes. High/critical are the ones that actually matter
+        # and are worth blocking a merge over.
+        run: npm audit --audit-level=high
+
+      # ── Server audit ────────────────────────────────────────────────────────
+      - name: Install server dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Audit server dependencies
+        working-directory: ./server
+        # Same threshold — high and above block the build.
+        # The server audit is MORE important than the frontend audit
+        # because server dependencies run with elevated privileges
+        # (database access, API keys) — a vulnerable server dependency
+        # has a larger blast radius than a vulnerable frontend dependency.
+        run: npm audit --audit-level=high
