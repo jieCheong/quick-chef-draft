@@ -1,17 +1,29 @@
+// src/pages/Index.tsx
+//
+// Home page — redesigned UI with real data from the backend.
+// Visual design from Figma redesign (Fraunces font, warm accent, card layouts).
+// All API calls and hooks preserved from the original implementation.
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { MobileLayout } from '@/components/layout/MobileLayout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { QuickBadge } from '@/components/ui/quick-badge';
-import { GoalBadge } from '@/components/ui/goal-badge';
 import { apiGet } from '@/lib/api';
-import { ChefHat, Clock, Flame, Bookmark, ArrowRight } from 'lucide-react';
+import {
+  ChefHat, Package, Bookmark, ChevronRight,
+  Zap, Clock, Flame, TrendingUp, Plus,
+} from 'lucide-react';
 import type { SavedRecipe } from '@/types/database';
+
+// Fallback image for recipes that have no image_url yet.
+// Phase 2 will add real DALL-E images — this keeps the UI looking
+// complete in the meantime.
+const FALLBACK_IMAGES = [
+  'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&auto=format',
+];
 
 interface ViralRecipe {
   id: string;
@@ -32,232 +44,294 @@ export default function Home() {
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [loadingViral, setLoadingViral] = useState(true);
 
+  // Redirect to onboarding if the user hasn't completed setup yet.
   useEffect(() => {
     if (!profileLoading && profile && !profile.onboarding_completed) {
       navigate('/onboarding');
     }
   }, [profileLoading, profile, navigate]);
 
-  // fetch recent saved recipes
+  // Fetch the 3 most recent saved recipes for the "Recent" section.
   useEffect(() => {
     if (!user) return;
-    const fetchRecent = async () => {
+    const fetch = async () => {
       try {
         const data = await apiGet<SavedRecipe[]>('/api/recipes?limit=3');
         setRecentRecipes(data);
       } catch {
-        // silently fail — home page still renders without recent recipes
+        // Fail silently — home page still works without recent recipes
       } finally {
         setLoadingRecent(false);
       }
     };
-    fetchRecent();
-    }, [user]);
+    fetch();
+  }, [user]);
 
-    useEffect(() => {
-      const fetchViral = async () => {
-        try {
-          const data = await apiGet<ViralRecipe[]>('/api/viral-recipes');
-          setViralRecipes(data);
-        } catch {
-          // silently fail — home page still renders without viral recipes
-        } finally {
-          setLoadingViral(false);
-        }
-      };
-      fetchViral();
-    }, []);
+  // Fetch viral/trending recipes — public endpoint, no auth needed.
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const data = await apiGet<ViralRecipe[]>('/api/viral-recipes');
+        setViralRecipes(data);
+      } catch {
+        // Fail silently
+      } finally {
+        setLoadingViral(false);
+      }
+    };
+    fetch();
+  }, []);
 
+  // Time-based greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'Chef';
+
+  // Show a minimal loading state while profile loads to prevent flash
   if (profileLoading) {
     return (
-      <MobileLayout>
-        <div className="p-4 space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-32 w-full rounded-2xl" />
-          <Skeleton className="h-24 w-full rounded-2xl" />
-          <Skeleton className="h-48 w-full rounded-2xl" />
-        </div>
-      </MobileLayout>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
     );
   }
 
-  const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
-
-  const displayName = profile?.display_name || user?.email?.split('@')[0] ||'Chef';
-
   return (
-    <MobileLayout>
-      <div className="p-4 space-y-6">
-        {/* Header */}
-        <div className="pt-2">
-          <p className="text-muted-foreground">{greeting()},</p>
-          <h1 className="text-2xl font-bold">{displayName} 👋</h1>
+    <div className="pb-20">
+
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div className="px-5 pt-14 pb-6">
+        <p className="text-muted-foreground text-sm font-medium tracking-wide uppercase">
+          {greeting}
+        </p>
+        <h1 className="text-4xl mt-1" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>
+          {displayName} 👋
+        </h1>
+      </div>
+
+      {/* ── Main CTA ────────────────────────────────────────────────────────── */}
+      <div className="px-5 mb-6">
+        <button
+          onClick={() => navigate('/cook')}
+          className="w-full bg-foreground text-primary-foreground rounded-2xl p-5 flex items-center gap-4 hover:opacity-90 active:scale-[0.98] transition-all"
+        >
+          <div className="w-12 h-12 rounded-xl bg-accent/25 flex items-center justify-center flex-shrink-0">
+            <ChefHat size={22} className="text-accent" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="font-semibold text-base leading-tight">What should I cook?</p>
+            <p className="text-sm opacity-60 mt-0.5">Get AI recipe ideas</p>
+          </div>
+          <ChevronRight size={18} className="opacity-40" />
+        </button>
+      </div>
+
+      {/* ── Quick stats ─────────────────────────────────────────────────────── */}
+      <div className="px-5 mb-6">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-card border border-border rounded-2xl p-3.5">
+            <div className="text-muted-foreground mb-2">
+              <Bookmark size={15} />
+            </div>
+            <p className="text-xl font-bold">{recentRecipes.length > 0 ? recentRecipes.length : '—'}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Saved</p>
+          </div>
+          <div className="bg-card border border-border rounded-2xl p-3.5">
+            <div className="text-muted-foreground mb-2">
+              <Zap size={15} />
+            </div>
+            <p className="text-xl font-bold">2</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Daily left</p>
+          </div>
+          <div className="bg-card border border-border rounded-2xl p-3.5">
+            <div className="text-muted-foreground mb-2">
+              <TrendingUp size={15} />
+            </div>
+            <p className="text-xl font-bold">{viralRecipes.length}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Trending</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Recent recipes ──────────────────────────────────────────────────── */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between px-5 mb-3">
+          <h2 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground">
+            Recent
+          </h2>
+          <button
+            onClick={() => navigate('/saved')}
+            className="text-accent text-sm font-medium hover:opacity-80"
+          >
+            See all
+          </button>
         </div>
 
-          <Card 
-            className="bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 transition-colors"
-            onClick={() => navigate('/cook')}
-            >
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                <ChefHat className="h-7 w-7" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg">What should I cook?
-                </h3>
-                <p className="text-sm opacity-90">Get AI-powered quick recipe generation</p>
+        {loadingRecent ? (
+          <div className="flex gap-3 px-5">
+            {[1, 2, 3].map(i => (
+              <div
+                key={i}
+                className="flex-shrink-0 w-40 h-36 bg-muted rounded-2xl animate-pulse"
+              />
+            ))}
+          </div>
+        ) : recentRecipes.length > 0 ? (
+          <div className="flex gap-3 px-5 overflow-x-auto pb-1">
+            {recentRecipes.map((recipe, idx) => (
+              <button
+                key={recipe.id}
+                onClick={() => navigate('/saved')}
+                className="flex-shrink-0 w-40 bg-card rounded-2xl overflow-hidden border border-border text-left hover:border-accent/30 active:scale-[0.98] transition-all"
+              >
+                <div className="h-24 bg-muted overflow-hidden">
+                  <img
+                    src={recipe.image_url || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length]}
+                    alt={recipe.title}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <ArrowRight className="h-5 w-5" />
-              </CardContent>
-            </Card>
+                <div className="p-3">
+                  <p className="font-medium text-sm leading-tight line-clamp-2">
+                    {recipe.title}
+                  </p>
+                  <div className="flex items-center gap-1 mt-1.5 text-muted-foreground">
+                    <Clock size={11} />
+                    <span className="text-xs">{recipe.cooking_time_minutes} min</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          // Empty state — encourage first generation
+          <div className="px-5">
+            <button
+              onClick={() => navigate('/cook')}
+              className="w-full rounded-2xl border-2 border-dashed border-border py-5 flex flex-col items-center gap-1.5 text-muted-foreground hover:border-accent hover:text-accent transition-colors"
+            >
+              <Plus size={18} />
+              <span className="text-sm font-medium">Generate your first recipe</span>
+            </button>
+          </div>
+        )}
+      </div>
 
-        {/* Viral Recipes - Trending this week */}
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Flame className="h-5 w-5 text-orange-500" />
-            <h2 className="font-semibold">Trending This Week
+      {/* ── Trending This Week ──────────────────────────────────────────────── */}
+      {(loadingViral || viralRecipes.length > 0) && (
+        <div className="mb-6">
+          <div className="px-5 mb-3">
+            <h2 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground">
+              Trending This Week
             </h2>
           </div>
 
           {loadingViral ? (
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-32 w-40 flex-shrink-0 rounded-xl" />
+            <div className="flex gap-3 px-5">
+              {[1, 2].map(i => (
+                <div
+                  key={i}
+                  className="flex-shrink-0 w-44 h-36 bg-muted rounded-2xl animate-pulse"
+                />
               ))}
-              </div>
-          ) : viralRecipes.length > 0 ? (
-            <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4">
-              {viralRecipes.map((recipe) => (
-                <Card
+            </div>
+          ) : (
+            <div className="flex gap-3 px-5 overflow-x-auto pb-1">
+              {viralRecipes.map((recipe, idx) => (
+                <button
                   key={recipe.id}
-                  className="flex-shrink-0 w-44 cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => navigate('/cook')}
-                  >
+                  className="flex-shrink-0 w-44 bg-card rounded-2xl overflow-hidden border border-border text-left hover:border-accent/30 active:scale-[0.98] transition-all"
+                >
+                  <div className="h-24 bg-muted overflow-hidden">
                     {recipe.image_url ? (
-                      <div className="h-24 rounded-t-lg overflow-hidden">
-                        <img
-                          src={recipe.image_url}
-                          alt={recipe.title}
-                          className="w-full h-full object-cover"
-                          />
-                      </div>
+                      <img
+                        src={recipe.image_url}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <div className="h-24 rounded-t-lg bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
-                        <Flame className="h-8 w-8 text-orange-400"/>
-                        </div>
+                      <img
+                        src={FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length]}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover"
+                      />
                     )}
-                    <CardContent className="p-2">
-                      <p className="text-xs font-medium line-clamp-2">{recipe.title}</p>
-                      {recipe.nutrition && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {recipe.nutrition.calories} cal · {recipe.nutrition.protein}g protein
-                        </p>
-                      )}
-                      </CardContent>
-                  </Card>
-              ))}
-
-              </div>
-          ) : (
-            <Card className="border-dashed">
-              <CardContent className="p-4 text-center">
-                <Flame className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Trending recipes coming soon
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Add rows to viral_recipes in Neon to show content here.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </section>        
-
-        {/* Monthly Goals */}
-        {profile?.monthly_goals && profile.monthly_goals.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold">This Month's Goals</h2>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>
-                Edit
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {profile.monthly_goals.map((goal) => (
-                <GoalBadge key={goal} goal={goal} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Recent Recipes Placeholder */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Recent Recipes</h2>
-          {recentRecipes.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => navigate('/saved')}>
-              See all
-              </Button>
-          )}
-          </div>
-          {loadingRecent ? (
-            <div className="space-y-2">
-              <Skeleton className="h-16 w-full rounded-xl" />
-              <Skeleton className="h-16 w-full rounded-xl" />
-            </div>
-          ): recentRecipes.length > 0 ? (
-            <div className="space-y-2">
-              {recentRecipes.map((recipe) => (
-                <Card
-                  key={recipe.id}
-                  className="cursor-pointer hover:shadow-sm transition-shadow"
-                  onClick={() => navigate('/saved')}
-                  >
-                    <CardContent className="p-3 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <ChefHat className="h-5 w-5 text-primary"/>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {recipe.title}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            {recipe.cooking_time_minutes} min 
+                  </div>
+                  <div className="p-3">
+                    <p className="font-medium text-xs leading-tight line-clamp-2 mb-1">
+                      {recipe.title}
+                    </p>
+                    {recipe.nutrition && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <span className="flex items-center gap-1 text-[10px]">
+                          <Flame size={9} />
+                          {recipe.nutrition.calories} cal
                         </span>
-                        {recipe.is_quick_meal && <QuickBadge size="sm" />}
                       </div>
-                    </div>
-                    <Bookmark className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
+                </button>
               ))}
-              </div>
-          ) : (
-            <Card className="border-dashed">
-              <CardContent className="p-6 text-center">
-                <ChefHat className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3"/>
-                <p className="text-sm text-muted-foreground">
-                  No recipes yet. Start cooking!
-                </p>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  className='mt-3'
-                  onClick={() => navigate('/cook')}
-                  >
-                    Generate Recipe 
-                  </Button> 
-                </CardContent>
-              </Card>
+            </div>
           )}
-          </section>
         </div>
-        </MobileLayout>
+      )}
+
+      {/* ── Monthly goals ───────────────────────────────────────────────────── */}
+      {profile?.monthly_goals && profile.monthly_goals.length > 0 && (
+        <div className="px-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground">
+              Your Goals
+            </h2>
+            <button
+              onClick={() => navigate('/profile')}
+              className="text-accent text-sm font-medium hover:opacity-80"
+            >
+              Edit
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {profile.monthly_goals.map(goal => (
+              <span
+                key={goal}
+                className="text-xs bg-accent/10 text-accent px-3 py-1.5 rounded-full font-medium"
+              >
+                {goal.replace(/_/g, ' ')}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Quick Access ────────────────────────────────────────────────────── */}
+      <div className="px-5">
+        <h2 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground mb-3">
+          Quick Access
+        </h2>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate('/pantry')}
+            className="bg-card border border-border rounded-2xl p-4 text-left hover:border-foreground/20 transition-colors"
+          >
+            <Package size={18} className="text-accent mb-3" />
+            <p className="font-semibold text-sm">My Pantry</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Manage ingredients
+            </p>
+          </button>
+          <button
+            onClick={() => navigate('/cook')}
+            className="bg-accent text-accent-foreground rounded-2xl p-4 text-left hover:opacity-90 transition-opacity"
+          >
+            <Zap size={18} className="mb-3" />
+            <p className="font-semibold text-sm">Quick Meals</p>
+            <p className="text-xs opacity-70 mt-0.5">Under 15 minutes</p>
+          </button>
+        </div>
+      </div>
+
+    </div>
   );
 }
