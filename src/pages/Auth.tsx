@@ -129,10 +129,10 @@ export default function Auth() {
       <div className="w-full max-w-sm space-y-6">
         {/* Logo */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent text-accent-foreground">
             <ChefHat className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold">QuickChef</h1>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>QuickChef</h1>
           <p className="text-muted-foreground text-sm">Your AI-powered cooking assistant</p>
         </div>
 
@@ -180,7 +180,11 @@ export default function Auth() {
                     {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                    disabled={isLoading}
+                  >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
                   </Button>
                 </form>
@@ -235,7 +239,11 @@ export default function Auth() {
                     {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                    disabled={isLoading}
+                  >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Account'}
                   </Button>
                 </form>

@@ -1,268 +1,125 @@
-import { useState, useEffect, useCallback } from 'react';
+// src/pages/Saved.tsx — redesigned UI, real API calls preserved
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { MobileLayout } from '@/components/layout/MobileLayout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { RecipeCard } from '@/components/recipe/RecipeCard';
-import { QuickBadge } from '@/components/ui/quick-badge';
-import { GoalBadge } from '@/components/ui/goal-badge';
-
-import { apiGet, apiDelete } from '@/lib/api';
-import { Search, BookmarkCheck, Zap, Clock, ArrowLeft, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { apiGet, apiDelete } from '@/lib/api';
+import { MobileLayout } from '@/components/layout/MobileLayout';
+import { cn } from '@/lib/utils';
+import { Plus, Bookmark, Clock, Flame, X } from 'lucide-react';
 import type { SavedRecipe } from '@/types/database';
+
+const FALLBACK = [
+  'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&auto=format',
+];
+
+const FILTERS = ['All', 'Quick', 'Easy', 'Healthy'];
 
 export default function SavedRecipes() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-
   const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [quickFilter, setQuickFilter] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState<SavedRecipe | null>(null);
-
-  const fetchRecipes = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await apiGet<SavedRecipe[]>('/api/recipes');
-      setRecipes(data);
-    } catch {
-      toast({ variant: 'destructive', description: 'Failed to load saved recipes.' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
+  const [filter, setFilter] = useState('All');
 
   useEffect(() => {
-    if (user) {
-      fetchRecipes();
-    }
-  }, [user, fetchRecipes]);
+    if (!user) return;
+    apiGet<SavedRecipe[]>('/api/recipes')
+      .then(setRecipes)
+      .catch(() => toast({ variant: 'destructive', description: 'Failed to load saved recipes.' }))
+      .finally(() => setIsLoading(false));
+  }, [user]);
 
   const deleteRecipe = async (id: string) => {
-    setRecipes(prev => prev.filter(r => r.id !== id));
-    setSelectedRecipe(null);
-    toast({ description: 'Recipe removed from favorites' });
+    const prev = recipes;
+    setRecipes(p => p.filter(r => r.id !== id));
     try {
       await apiDelete(`/api/recipes/${id}`);
+      toast({ description: 'Recipe removed.' });
     } catch {
+      setRecipes(prev);
       toast({ variant: 'destructive', description: 'Failed to delete recipe.' });
-      fetchRecipes();
     }
   };
 
-  const filteredRecipes = recipes.filter(recipe => {
-    const matchesSearch = recipe.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesQuick = !quickFilter || recipe.is_quick_meal;
-    return matchesSearch && matchesQuick;
-  });
-
-  // Recipe Detail View
-  if (selectedRecipe) {
-    return (
-      <MobileLayout showNav={false}>
-        <div className="min-h-screen">
-          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
-            <div className="flex items-center justify-between p-4">
-              <Button variant="ghost" size="icon" onClick={() => setSelectedRecipe(null)}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => deleteRecipe(selectedRecipe.id)}
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Remove
-              </Button>
-            </div>
-          </div>
-
-          <div className="p-4 space-y-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                {selectedRecipe.is_quick_meal && <QuickBadge />}
-              </div>
-              <h1 className="text-2xl font-bold">{selectedRecipe.title}</h1>
-              {selectedRecipe.description && (
-                <p className="text-muted-foreground mt-2">{selectedRecipe.description}</p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{selectedRecipe.cooking_time_minutes} min</span>
-              </div>
-              <Badge variant="secondary">{selectedRecipe.difficulty}</Badge>
-              <span>{selectedRecipe.servings} servings</span>
-            </div>
-
-            {selectedRecipe.goal_alignment.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {selectedRecipe.goal_alignment.map(goal => (
-                  <GoalBadge key={goal} goal={goal} />
-                ))}
-              </div>
-            )}
-
-            {selectedRecipe.nutrition && (
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="font-medium mb-3">Nutrition</h3>
-                  <div className="grid grid-cols-5 gap-2 text-center">
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.calories}</p>
-                      <p className="text-xs text-muted-foreground">cal</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.protein}g</p>
-                      <p className="text-xs text-muted-foreground">protein</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.carbs}g</p>
-                      <p className="text-xs text-muted-foreground">carbs</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.fat}g</p>
-                      <p className="text-xs text-muted-foreground">fat</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.fiber}g</p>
-                      <p className="text-xs text-muted-foreground">fiber</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-medium mb-3">Ingredients</h3>
-                <ul className="space-y-2">
-                  {selectedRecipe.ingredients.map((ing, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                      <span>
-                        <strong>{ing.amount} {ing.unit}</strong> {ing.name}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-medium mb-3">Instructions</h3>
-                <ol className="space-y-4">
-                  {selectedRecipe.instructions.map((step, idx) => (
-                    <li key={idx} className="flex gap-3">
-                      <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center flex-shrink-0">
-                        {step.step}
-                      </span>
-                      <p className="text-sm leading-relaxed">{step.instruction}</p>
-                    </li>
-                  ))}
-                </ol>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </MobileLayout>
-    );
-  }
-
-  if ( isLoading) {
-    return (
-      <MobileLayout>
-        <div className="p-4 space-y-4">
-          <Skeleton className="h-8 w-40" />
-          <Skeleton className="h-12 w-full" />
-          <div className="grid grid-cols-2 gap-3">
-            <Skeleton className="h-48" />
-            <Skeleton className="h-48" />
-          </div>
-        </div>
-      </MobileLayout>
-    );
-  }
+  const displayed = filter === 'All' ? recipes
+    : filter === 'Quick' ? recipes.filter(r => r.is_quick_meal)
+    : filter === 'Easy' ? recipes.filter(r => r.difficulty?.toLowerCase() === 'easy')
+    : recipes.filter(r => r.goal_alignment?.some(g => g.toLowerCase().includes('protein') || g.toLowerCase().includes('calorie')));
 
   return (
     <MobileLayout>
-      <div className="p-4 space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold">Saved Recipes</h1>
-          <p className="text-muted-foreground">Your favorite recipes</p>
+      <div>
+        <div className="px-5 pt-14 pb-5">
+          <h1 className="text-4xl" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>Saved</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{recipes.length} recipes bookmarked</p>
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search recipes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Button
-            variant={quickFilter ? 'default' : 'outline'}
-            size="icon"
-            onClick={() => setQuickFilter(!quickFilter)}
-            className={cn(quickFilter && 'bg-quick text-quick-foreground hover:bg-quick/90')}
-          >
-            <Zap className="h-4 w-4" />
-          </Button>
+        {/* Filters */}
+        <div className="flex gap-2 px-5 mb-5 overflow-x-auto pb-1">
+          {FILTERS.map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={cn('flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors',
+                filter === f ? 'bg-foreground text-primary-foreground' : 'bg-secondary text-muted-foreground')}>
+              {f}
+            </button>
+          ))}
         </div>
 
-        {/* Filter Info */}
-        {quickFilter && (
-          <div className="flex items-center gap-2">
-            <QuickBadge size="sm" />
-            <span className="text-sm text-muted-foreground">Showing quick meals only</span>
-          </div>
-        )}
-
-        {/* Recipes Grid */}
-        {filteredRecipes.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3">
-            {filteredRecipes.map((recipe) => (
-              <RecipeCard
-                key={recipe.id}
-                recipe={recipe}
-                onClick={() => setSelectedRecipe(recipe)}
-              />
-            ))}
-          </div>
-        ) : (
-          <Card className="border-dashed">
-            <CardContent className="p-6 text-center">
-              <BookmarkCheck className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+        <div className="px-5 space-y-3 pb-6">
+          {isLoading ? (
+            [1, 2, 3].map(i => <div key={i} className="h-24 bg-muted rounded-2xl animate-pulse" />)
+          ) : displayed.length > 0 ? (
+            displayed.map((recipe, idx) => (
+              <div key={recipe.id} className="bg-card rounded-2xl overflow-hidden border border-border flex">
+                <div className="w-28 flex-shrink-0 bg-muted">
+                  <img
+                    src={recipe.image_url || FALLBACK[idx % FALLBACK.length]}
+                    alt={recipe.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 p-4">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-semibold text-sm leading-tight">{recipe.title}</h3>
+                    <button onClick={() => deleteRecipe(recipe.id)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><Clock size={11} />{recipe.cooking_time_minutes} min</span>
+                    {recipe.nutrition && <span className="flex items-center gap-1"><Flame size={11} />{recipe.nutrition.calories} cal</span>}
+                  </div>
+                  <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {recipe.cuisines?.slice(0, 2).map(t => (
+                      <span key={t} className="text-[10px] bg-secondary px-2 py-0.5 rounded-full text-muted-foreground capitalize">{t}</span>
+                    ))}
+                    {recipe.is_quick_meal && (
+                      <span className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-full">Quick</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-12">
+              <Bookmark size={32} className="mx-auto text-muted-foreground/40 mb-3" />
               <p className="text-sm text-muted-foreground">
-                {searchQuery || quickFilter ? 'No matching recipes found' : 'No saved recipes yet'}
+                {filter !== 'All' ? 'No matching recipes' : 'No saved recipes yet'}
               </p>
-              {!searchQuery && !quickFilter && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-3"
-                  onClick={() => navigate('/cook')}
-                >
-                  Generate Recipes
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          )}
+
+          <button onClick={() => navigate('/cook')}
+            className="w-full rounded-2xl border-2 border-dashed border-border py-5 flex flex-col items-center gap-1.5 text-muted-foreground hover:border-accent hover:text-accent transition-colors">
+            <Plus size={18} />
+            <span className="text-sm font-medium">Generate a new recipe</span>
+          </button>
+        </div>
       </div>
     </MobileLayout>
   );

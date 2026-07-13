@@ -1,235 +1,159 @@
-import { useState, useEffect, useCallback } from 'react';
+// src/pages/Pantry.tsx — redesigned UI, real API calls preserved
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { MobileLayout } from '@/components/layout/MobileLayout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, apiPost, apiDelete } from '@/lib/api';
-import { X, Package, Search } from 'lucide-react';
+import { MobileLayout } from '@/components/layout/MobileLayout';
 import { cn } from '@/lib/utils';
 import { INGREDIENT_CATEGORIES, type PantryItem, type IngredientCategory } from '@/types/database';
-
-const COMMON_ITEMS: Record<IngredientCategory, string[]> = {
-  proteins: ['Chicken', 'Beef', 'Pork', 'Salmon', 'Tofu', 'Eggs'],
-  vegetables: ['Onion', 'Garlic', 'Tomato', 'Bell Pepper', 'Broccoli', 'Carrot'],
-  fruits: ['Lemon', 'Lime', 'Apple', 'Banana', 'Avocado'],
-  dairy: ['Butter', 'Milk', 'Cheese', 'Yogurt', 'Cream'],
-  grains: ['Rice', 'Pasta', 'Bread', 'Oats', 'Flour'],
-  spices: ['Salt', 'Pepper', 'Cumin', 'Paprika', 'Oregano', 'Basil'],
-  condiments: ['Olive Oil', 'Soy Sauce', 'Vinegar', 'Honey', 'Mustard'],
-  other: ['Sugar', 'Vegetable Stock', 'Coconut Milk'],
-};
+import { Plus, X, Package, Search } from 'lucide-react';
 
 export default function Pantry() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-
   const [items, setItems] = useState<PantryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [inputValue, setInputValue] = useState('');
+  const [input, setInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<IngredientCategory>('other');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [search, setSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  const fetchItems = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await apiGet<PantryItem[]>('/api/pantry');
-      setItems(data);
-    } catch {
-      toast({ variant: 'destructive', description: 'Failed to load pantry items.' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
   useEffect(() => {
-    if (user) {
-      fetchItems();
-    }
-  }, [user, fetchItems]);
+    if (!user) return;
+    const fetch = async () => {
+      try {
+        const data = await apiGet<PantryItem[]>('/api/pantry');
+        setItems(data);
+      } catch {
+        toast({ variant: 'destructive', description: 'Failed to load pantry items.' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetch();
+  }, [user]);
 
-  const addItem = async (name: string, category: IngredientCategory = selectedCategory) => {
-    if (!user || !name.trim()) return;
+  const addItem = async () => {
+    if (!input.trim()) return;
     setIsAdding(true);
     try {
-      const newItem = await apiPost<PantryItem>('/api/pantry', { name: name.trim(), category });
-      setItems(prev => [...prev, newItem]);
-      setInputValue('');
+      const newItem = await apiPost<PantryItem>('/api/pantry', { name: input.trim(), category: selectedCategory });
+      setItems(p => [...p, newItem]);
+      setInput('');
     } catch (err) {
-      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Failed to add item.' });
+      const msg = err instanceof Error ? err.message : 'Failed to add item.';
+      toast({ variant: 'destructive', description: msg });
     } finally {
       setIsAdding(false);
     }
   };
 
   const removeItem = async (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
+    const prev = items;
+    setItems(p => p.filter(i => i.id !== id));
     try {
       await apiDelete(`/api/pantry/${id}`);
     } catch {
+      setItems(prev);
       toast({ variant: 'destructive', description: 'Failed to remove item.' });
-      fetchItems();
     }
   };
 
-  const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = search
+    ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    : items;
 
-  const groupedItems = INGREDIENT_CATEGORIES.reduce((acc, cat) => {
-    const categoryItems = filteredItems.filter(item => item.category === cat.value);
-    if (categoryItems.length > 0) {
-      acc[cat.value] = categoryItems;
-    }
+  const grouped = INGREDIENT_CATEGORIES.reduce((acc, cat) => {
+    const catItems = filtered.filter(i => i.category === cat.value);
+    if (catItems.length > 0) acc[cat.value] = catItems;
     return acc;
-  }, {} as Record<IngredientCategory, PantryItem[]>);
-
-  if (isLoading) {
-    return (
-      <MobileLayout>
-        <div className="p-4 space-y-4">
-          <Skeleton className="h-8 w-32" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
-      </MobileLayout>
-    );
-  }
+  }, {} as Record<string, PantryItem[]>);
 
   return (
     <MobileLayout>
-      <div className="p-4 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">My Pantry</h1>
-          <p className="text-muted-foreground">Manage ingredients you have at home</p>
+      <div>
+        <div className="px-5 pt-14 pb-5">
+          <h1 className="text-4xl" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>My Pantry</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{items.length} ingredients tracked</p>
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search ingredients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        <div className="px-5 mb-4">
+          <div className="relative">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input type="text" placeholder="Search ingredients..." value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full bg-secondary rounded-xl pl-9 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/30 placeholder:text-muted-foreground" />
+          </div>
         </div>
 
-        {/* Add New Item */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Add Ingredient</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <IngredientAutocomplete
-              value={inputValue}
-              onChange={setInputValue}
-              onAddIngredient={(ingredient) => addItem(ingredient)}
-              existingIngredients={items.map(i => i.name.toLowerCase())}
-              placeholder="Type an ingredient..."
-              isLoading={isAdding}
-            />
+        {/* Add item */}
+        <div className="px-5 mb-5">
+          <div className="flex gap-2 mb-3">
+            <input type="text" placeholder="Add an ingredient..." value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addItem()}
+              className="flex-1 bg-secondary rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/30 placeholder:text-muted-foreground" />
+            <button onClick={addItem} disabled={!input.trim() || isAdding}
+              className="w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center disabled:opacity-35 hover:opacity-90 active:scale-95 transition-all">
+              <Plus size={18} />
+            </button>
+          </div>
+          {/* Category pills */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {INGREDIENT_CATEGORIES.map(cat => (
+              <button key={cat.value} onClick={() => setSelectedCategory(cat.value)}
+                className={cn('flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  selectedCategory === cat.value ? 'bg-foreground text-primary-foreground' : 'bg-secondary text-muted-foreground')}>
+                {cat.emoji} {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-            {/* Category Selector */}
-            <div className="flex flex-wrap gap-1.5">
-              {INGREDIENT_CATEGORIES.map((cat) => (
-                <Badge
-                  key={cat.value}
-                  variant={selectedCategory === cat.value ? 'default' : 'outline'}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedCategory(cat.value)}
-                >
-                  {cat.emoji} {cat.label}
-                </Badge>
-              ))}
-            </div>
-
-            {/* Quick Add Common Items */}
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">Quick add:</p>
-              <div className="flex flex-wrap gap-1.5">
-                {COMMON_ITEMS[selectedCategory].slice(0, 6).map((item) => {
-                  const alreadyAdded = items.some(i => i.name.toLowerCase() === item.toLowerCase());
-                  return (
-                    <Badge
-                      key={item}
-                      variant="secondary"
-                      className={cn(
-                        'cursor-pointer',
-                        alreadyAdded && 'opacity-50 cursor-not-allowed'
-                      )}
-                      onClick={() => !alreadyAdded && addItem(item, selectedCategory)}
-                    >
-                      + {item}
-                    </Badge>
-                  );
-                })}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pantry Items */}
-        {Object.keys(groupedItems).length > 0 ? (
-          <div className="space-y-4">
-            {Object.entries(groupedItems).map(([category, categoryItems]) => {
-              const catInfo = INGREDIENT_CATEGORIES.find(c => c.value === category);
+        {/* Items */}
+        <div className="px-5 space-y-6 pb-6">
+          {isLoading ? (
+            [1, 2, 3].map(i => <div key={i} className="h-20 bg-muted rounded-2xl animate-pulse" />)
+          ) : Object.entries(grouped).length > 0 ? (
+            Object.entries(grouped).map(([cat, catItems]) => {
+              const catInfo = INGREDIENT_CATEGORIES.find(c => c.value === cat);
               return (
-                <div key={category}>
-                  <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
-                    <span>{catInfo?.emoji}</span>
-                    {catInfo?.label}
-                    <Badge variant="secondary" className="text-xs">{categoryItems.length}</Badge>
-                  </h3>
+                <div key={cat}>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h3 className="text-sm font-semibold">{catInfo?.emoji} {catInfo?.label}</h3>
+                    <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{catItems.length}</span>
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    {categoryItems.map((item) => (
-                      <Badge
-                        key={item.id}
-                        variant="secondary"
-                        className="pl-3 pr-1.5 py-1.5 cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={() => removeItem(item.id)}
-                      >
+                    {catItems.map(item => (
+                      <button key={item.id} onClick={() => removeItem(item.id)}
+                        className="flex items-center gap-1.5 bg-card border border-border text-sm px-3 py-1.5 rounded-full hover:border-destructive hover:text-destructive transition-colors group">
                         {item.name}
-                        <X className="h-3 w-3 ml-1.5" />
-                      </Badge>
+                        <X size={11} className="opacity-35 group-hover:opacity-100 transition-opacity" />
+                      </button>
                     ))}
                   </div>
                 </div>
               );
-            })}
-          </div>
-        ) : (
-          <Card className="border-dashed">
-            <CardContent className="p-6 text-center">
-              <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+            })
+          ) : (
+            <div className="text-center py-12">
+              <Package size={32} className="mx-auto text-muted-foreground/40 mb-3" />
               <p className="text-sm text-muted-foreground">
-                {searchQuery ? 'No matching ingredients' : 'Your pantry is empty'}
+                {search ? 'No matching ingredients' : 'Your pantry is empty'}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Add ingredients to quickly use them when generating recipes
-              </p>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          )}
 
-        {/* Use in Cooking */}
-        {items.length > 0 && (
-          <Button 
-            className="w-full" 
-            onClick={() => navigate('/cook')}
-          >
-            <Package className="h-4 w-4 mr-2" />
-            Cook with Pantry Items
-          </Button>
-        )}
+          {items.length > 0 && (
+            <button onClick={() => navigate('/cook')}
+              className="w-full bg-foreground text-primary-foreground rounded-2xl py-3.5 text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+              <Package size={15} /> Cook with pantry items
+            </button>
+          )}
+        </div>
       </div>
     </MobileLayout>
   );

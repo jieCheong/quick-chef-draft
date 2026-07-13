@@ -1,718 +1,364 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+// src/pages/Cook.tsx — redesigned with MobileLayout wrapper on all states
+import { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { useRecipeImage } from '@/hooks/useRecipeImage';
-import { MobileLayout } from '@/components/layout/MobileLayout';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { QuickBadge } from '@/components/ui/quick-badge';
-import { GoalBadge } from '@/components/ui/goal-badge';
-import { RecipeCard } from '@/components/recipe/RecipeCard';
-import { RecipeStepCard } from '@/components/recipe/RecipeStepCard';
-import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
-import { RecipeLoadingSkeleton } from '@/components/cook/RecipeLoadingSkeleton';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, apiPost } from '@/lib/api';
-import { CookingMode } from '@/components/cook/CookingMode';
-import { 
-  ChefHat, Plus, X, Package, Clock, Sparkles, Loader2, Zap, 
-  ArrowLeft, Bookmark, ChevronRight, Heart, ImagePlus, Play
-} from 'lucide-react';
+import { MobileLayout } from '@/components/layout/MobileLayout';
 import { cn } from '@/lib/utils';
-import { TIME_OPTIONS, type SavedRecipe, type PantryItem, type RecipeIngredient, type RecipeInstruction, type RecipeNutrition, type MonthlyGoal } from '@/types/database';
+import type { PantryItem, SavedRecipe } from '@/types/database';
+import {
+  ChefHat, Plus, X, Sparkles, ArrowLeft, Heart,
+  Timer, Zap, Package, Clock, Flame, Leaf, Star,
+  Bookmark, Play,
+} from 'lucide-react';
 
-type GeneratedRecipe = Omit<SavedRecipe, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
+type CookStep = 'input' | 'generating' | 'results' | 'detail';
+
+interface RecipeIngredient { name: string; amount: string; unit: string; }
+interface RecipeInstruction { step: number; instruction: string; duration_minutes?: number; }
+interface RecipeNutrition { calories: number; protein: number; carbs: number; fat: number; fiber: number; }
+interface GeneratedRecipe {
+  title: string; description: string; cooking_time_minutes: number;
+  difficulty: string; servings: number; is_quick_meal: boolean;
+  cuisines: string[]; goal_alignment: string[];
+  ingredients: RecipeIngredient[]; instructions: RecipeInstruction[];
+  nutrition: RecipeNutrition; image_url?: string | null;
+}
+
+const FALLBACK = [
+  'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800&h=600&fit=crop&auto=format',
+  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&auto=format',
+];
+
+function RecipeDetail({ recipe, idx, onBack, onSave, saving }: {
+  recipe: GeneratedRecipe; idx: number; onBack: () => void;
+  onSave: (r: GeneratedRecipe) => void; saving: boolean;
+}) {
+  const [tab, setTab] = useState<'ingredients' | 'steps'>('ingredients');
+  const [saved, setSaved] = useState(false);
+  const img = recipe.image_url || FALLBACK[idx % FALLBACK.length];
+
+  const handleSave = () => { if (saved) return; setSaved(true); onSave(recipe); };
+
+  return (
+    <MobileLayout showNav={false}>
+      <div>
+        <div className="relative h-64 bg-muted">
+          <img src={img} alt={recipe.title} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
+          <div className="absolute top-14 inset-x-0 px-5 flex items-center justify-between">
+            <button onClick={onBack} className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white">
+              <ArrowLeft size={17} />
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className={cn('w-9 h-9 rounded-full flex items-center justify-center transition-colors',
+                saved ? 'bg-accent text-white' : 'bg-black/40 backdrop-blur-sm text-white')}>
+              <Bookmark size={17} />
+            </button>
+          </div>
+        </div>
+
+        <div className="-mt-5 bg-background rounded-t-3xl px-5 pt-6 pb-20">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            {recipe.cuisines.map(t => (
+              <span key={t} className="text-xs bg-secondary px-2.5 py-1 rounded-full text-muted-foreground capitalize">{t}</span>
+            ))}
+            {recipe.is_quick_meal && (
+              <span className="text-xs bg-accent/10 text-accent px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                <Zap size={9} /> Quick
+              </span>
+            )}
+          </div>
+
+          <h1 className="text-2xl leading-tight mb-1" style={{ fontFamily: 'Fraunces, serif' }}>{recipe.title}</h1>
+          <p className="text-sm text-muted-foreground mb-5">{recipe.description}</p>
+
+          <div className="grid grid-cols-4 gap-2 mb-6">
+            {[
+              { label: 'Time', value: `${recipe.cooking_time_minutes}m`, icon: <Clock size={13} /> },
+              { label: 'Calories', value: `${recipe.nutrition.calories}`, icon: <Flame size={13} /> },
+              { label: 'Protein', value: `${recipe.nutrition.protein}g`, icon: <Leaf size={13} /> },
+              { label: 'Difficulty', value: recipe.difficulty, icon: <Star size={13} /> },
+            ].map(({ label, value, icon }) => (
+              <div key={label} className="bg-secondary rounded-xl p-2.5 text-center">
+                <div className="flex justify-center text-accent mb-1">{icon}</div>
+                <p className="font-semibold text-xs">{value}</p>
+                <p className="text-[9px] text-muted-foreground mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-1 bg-secondary p-1 rounded-xl mb-5">
+            {(['ingredients', 'steps'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                className={cn('flex-1 py-2 rounded-lg text-sm font-medium capitalize transition-colors',
+                  tab === t ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground')}>
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'ingredients' ? (
+            <div className="space-y-1 mb-6">
+              {recipe.ingredients.map((ing, i) => (
+                <div key={i} className="flex items-center gap-3 py-2.5 border-b border-border last:border-0">
+                  <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-[10px] font-semibold text-muted-foreground flex-shrink-0">{i + 1}</div>
+                  <span className="text-sm"><span className="font-medium">{ing.amount} {ing.unit}</span> {ing.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4 mb-6">
+              {recipe.instructions.map((s, i) => (
+                <div key={i} className="flex gap-3.5">
+                  <div className="w-7 h-7 rounded-full bg-accent text-white flex-shrink-0 flex items-center justify-center text-xs font-bold">{s.step}</div>
+                  <p className="text-sm leading-relaxed pt-1">{s.instruction}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button onClick={handleSave} disabled={saved || saving}
+            className="w-full bg-foreground text-primary-foreground rounded-2xl py-4 font-semibold flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50">
+            <Play size={17} />
+            {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Recipe'}
+          </button>
+        </div>
+      </div>
+    </MobileLayout>
+  );
+}
 
 export default function Cook() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
-  useRecipeImage();
-
+  const [step, setStep] = useState<CookStep>('input');
   const [ingredients, setIngredients] = useState<string[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [selectedTime, setSelectedTime] = useState<number>(searchParams.get('quick') ? 15 : 30);
-  const [quickMealsOnly, setQuickMealsOnly] = useState(searchParams.get('quick') === 'true');
-  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-  const [isLoadingPantry, setIsLoadingPantry] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [input, setInput] = useState('');
+  const [craving, setCraving] = useState('');
+  const [selectedTime, setSelectedTime] = useState(30);
+  const [quickMealsOnly, setQuickMealsOnly] = useState(false);
   const [generatedRecipes, setGeneratedRecipes] = useState<GeneratedRecipe[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<GeneratedRecipe | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [savingRecipe, setSavingRecipe] = useState(false);
-  const [craving, setCraving] = useState('');
-  const [stepImages, setStepImages] = useState<Record<number, string>>({});
-  const [generatingStepImage, setGeneratingStepImage] = useState<number | null>(null);
-  const [recipeImage, setRecipeImage] = useState<string | null>(null);
-  const [generatingRecipeImage, setGeneratingRecipeImage] = useState(false);
-  const [cookingMode, setCookingMode] = useState(false);
-  const [previewImages, setPreviewImages] = useState<Record<number, string>>({});
-
-  const fetchPantryItems = useCallback(async () => {
-    if (!user) return;
-
-    setIsLoadingPantry(true);
-    try {
-      const items = await apiGet<PantryItem[]>('/api/pantry');
-      setPantryItems(items);
-    } catch (error) {
-      console.error('Failed to load pantry items: ', error);
-    } finally {
-      setIsLoadingPantry(false);
-    }
-  }, [user]);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    if (user) {
-      fetchPantryItems();
-    }
-  }, [user, fetchPantryItems]);
+    if (!user) return;
+    apiGet<PantryItem[]>('/api/pantry').then(setPantryItems).catch(() => {});
+  }, [user]);
 
-  const addIngredient = (ingredient: string) => {
-    const trimmed = ingredient.trim().toLowerCase();
-    if (trimmed && !ingredients.includes(trimmed)) {
-      setIngredients([...ingredients, trimmed]);
-    }
-    setInputValue('');
-  };
-
-  const removeIngredient = (ingredient: string) => {
-    setIngredients(ingredients.filter(i => i !== ingredient));
-  };
-
-  const addFromPantry = () => {
-    const pantryIngredients = pantryItems.map(item => item.name.toLowerCase());
-    const newIngredients = [...new Set([...ingredients, ...pantryIngredients])];
-    setIngredients(newIngredients);
-    toast({
-      description: `Added ${pantryItems.length} items from your pantry`,
-    });
+  const addIngredient = () => {
+    const t = input.trim().toLowerCase();
+    if (t && !ingredients.includes(t)) setIngredients(p => [...p, t]);
+    setInput('');
   };
 
   const generateRecipes = async (retry = 0) => {
     if (ingredients.length === 0) {
-      toast({
-        variant: 'destructive',
-        description: 'Please add at least one ingredient',
-      });
+      toast({ variant: 'destructive', description: 'Please add at least one ingredient.' });
       return;
     }
-
-    setIsGenerating(true);
+    setStep('generating');
     setGeneratedRecipes([]);
     setRetryCount(retry);
-
     try {
-    const data = await apiPost<{
-      recipes: GeneratedRecipe[];
-      usage: { used: number; max: number; remaining: number };
-    }>('/api/generate-recipe', {
-      ingredients,
-      maxTime: quickMealsOnly ? 15 : selectedTime,
-      dietaryStyle: profile?.dietary_style,
-      allergies: profile?.allergies,
-      skillLevel: profile?.skill_level,
-      cuisines: profile?.preferred_cuisines,
-      goals: profile?.monthly_goals,
-      craving: craving.trim() || undefined,
-    });
-
-    setGeneratedRecipes(data.recipes);
-
-    if (data.usage.remaining === 1) {
-      toast({ description: '1 free generation remaining today.' });
-    } else if (data.usage.remaining === 0) {
-      toast({ description: "You've used all free generations for today." });
+      const data = await apiPost<{ recipes: GeneratedRecipe[]; usage: { used: number; max: number; remaining: number } }>(
+        '/api/generate-recipe', {
+          ingredients, maxTime: quickMealsOnly ? 15 : selectedTime,
+          dietaryStyle: profile?.dietary_style, allergies: profile?.allergies,
+          skillLevel: profile?.skill_level, cuisines: profile?.preferred_cuisines,
+          goals: profile?.monthly_goals, craving: craving.trim() || undefined,
+        }
+      );
+      setGeneratedRecipes(data.recipes);
+      setStep('results');
+      setRetryCount(0);
+      if (data.usage.remaining === 1) toast({ description: '1 free generation remaining today.' });
+      if (data.usage.remaining === 0) toast({ description: "You've used all free generations for today." });
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      if (err?.message?.includes('Daily limit')) {
+        toast({ variant: 'destructive', title: 'Daily limit reached', description: err.message });
+        setStep('input'); return;
+      }
+      if (retry < 2) {
+        toast({ description: 'Connection slow, retrying...' });
+        setTimeout(() => generateRecipes(retry + 1), Math.pow(2, retry) * 1000); return;
+      }
+      toast({ variant: 'destructive', description: 'Failed to generate recipes. Please try again.' });
+      setStep('input'); setRetryCount(0);
     }
-
-    setRetryCount(0);
-  } catch (error) {
-    // 429 = daily limit hit
-    if (error instanceof Error && error.message.includes('Daily limit')) {
-      toast({
-        variant: 'destructive',
-        title: 'Daily limit reached',
-        description: error.message,
-      });
-      setIsGenerating(false);
-      return;
-    }
-
-    // Auto-retry for other errors
-    if (retry < 2) {
-      const delay = Math.pow(2, retry) * 1000;
-      toast({ description: `Connection slow, retrying...` });
-      setTimeout(() => generateRecipes(retry + 1), delay);
-      return;
-    }
-
-    toast({
-      variant: 'destructive',
-      title: 'Error',
-      description: 'Failed to generate recipes. Please try again.',
-    });
-    setRetryCount(0);
-  } finally {
-    setIsGenerating(false);
-  }
-   
   };
 
-  const saveRecipe = async (recipe: GeneratedRecipe, withImage = false) => {
+  const saveRecipe = async (recipe: GeneratedRecipe) => {
     if (!user) return;
-
     setSavingRecipe(true);
     try {
       await apiPost<SavedRecipe>('/api/recipes', recipe);
-      toast({
-        title: 'Recipe saved!',
-        description: withImage
-        ? 'Image generation coming'
-        : 'Find it in saved recipes',
-      });
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        description: 'Failed to save recipe. Please try again.',
-      });
+      toast({ title: 'Recipe saved!', description: 'Find it in your saved recipes.' });
+    } catch {
+      toast({ variant: 'destructive', description: 'Failed to save recipe.' });
     } finally {
       setSavingRecipe(false);
     }
   };
 
-  // TODO: connect to backend
-  const generatePreviewImage = async (_recipe: GeneratedRecipe, _index: number) => {
-    // no-op stub
-  };
-  // Generate preview images for all recipes
-  const generatePreviewImagesForRecipes = async (recipes: GeneratedRecipe[]) => {
-    setPreviewImages({});
-    // Generate all images in parallel
-    await Promise.all(recipes.map((recipe, index) => generatePreviewImage(recipe, index)));
-  };
+  if (step === 'detail' && selectedRecipe) {
+    return <RecipeDetail recipe={selectedRecipe} idx={selectedIdx} onBack={() => setStep('results')} onSave={saveRecipe} saving={savingRecipe} />;
+  }
 
-  const generateRecipeMainImage = async (_recipe: GeneratedRecipe) => {
-    setGeneratingRecipeImage(false);
-    /*try {
-      const ingredientList = recipe.ingredients.slice(0, 5).map(i => i.name).join(", ");
-      const prompt = `Professional, appetizing food photography of ${recipe.title}. ${recipe.description || ""} Main ingredients: ${ingredientList}. Styled on a modern plate, soft natural lighting, shallow depth of field, restaurant quality. Ultra high resolution.`;
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-recipe-image`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({
-            recipeId: 'temp',
-            recipeTitle: recipe.title,
-            recipeDescription: recipe.description,
-            ingredients: recipe.ingredients.map(i => i.name),
-          }),
-        }
-      );
-
-      const data = await response.json();
-      if (data.image_url) {
-        setRecipeImage(data.image_url);
-      }
-    } catch (error) {
-      console.error('Error generating recipe image:', error);
-    } finally {
-      setGeneratingRecipeImage(false);
-    }
-    */
-  };
-
-  const generateStepImage = async (step: { step: number; instruction: string }, _recipe: GeneratedRecipe): Promise<string | null> => {
-    /*setGeneratingStepImage(step.step);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-step-images`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({
-            recipeTitle: recipe.title,
-            stepNumber: step.step,
-            stepInstruction: step.instruction,
-            ingredients: recipe.ingredients.map(i => i.name),
-          }),
-        }
-      );
-
-      const data = await response.json();
-      if (data.image_url) {
-        setStepImages(prev => ({ ...prev, [step.step]: data.image_url }));
-        return data.image_url;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error generating step image:', error);
-      return null;
-    } finally {
-      setGeneratingStepImage(null);
-    } */
-   return null;
-  };
-
-  // Auto-generate step images when selecting a new recipe
-  useEffect(() => {
-    if (selectedRecipe) {
-      setStepImages({});
-      setCookingMode(false);
-
-      if (selectedRecipe.image_url) {
-        setRecipeImage(selectedRecipe.image_url);
-      } else {
-        setRecipeImage(null);
-        generateRecipeMainImage(selectedRecipe);
-      }
-
-      generateStepImagesAuto(selectedRecipe);
-    }
-  // Only re-run when the recipe changes (title is the stable identity key)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRecipe?.title]);
-
-  // Generate step images automatically in batches
-  const generateStepImagesAuto = async (recipe: GeneratedRecipe) => {
-    const steps = recipe.instructions;
-    const batchSize = 2;
-    
-    for (let i = 0; i < steps.length; i += batchSize) {
-      const batch = steps.slice(i, i + batchSize);
-      await Promise.all(
-        batch.map(step => generateStepImage(step, recipe))
-      );
-    }
-  };
-
-  // Recipe Detail View
-  if (selectedRecipe) {
-    // Show Cooking Mode if active
-    if (cookingMode) {
-      return (
-        <CookingMode
-          recipe={selectedRecipe}
-          stepImages={stepImages}
-          onGenerateStepImage={(step) => generateStepImage(step, selectedRecipe)}
-          generatingStepImage={generatingStepImage}
-          onClose={() => setCookingMode(false)}
-        />
-      );
-    }
-
+  if (step === 'generating') {
     return (
-      <MobileLayout showNav={false}>
-        <div className="min-h-screen">
-          {/* Header */}
-          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
-            <div className="flex items-center justify-between p-4">
-              <Button variant="ghost" size="icon" onClick={() => setSelectedRecipe(null)}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => saveRecipe(selectedRecipe)}
-                disabled={savingRecipe}
-              >
-                {savingRecipe ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Bookmark className="h-4 w-4 mr-1" />
-                    Save
-                  </>
-                )}
-              </Button>
+      <MobileLayout>
+        <div className="flex flex-col items-center justify-center min-h-[80vh] px-8 text-center">
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }} className="mb-6">
+            <ChefHat size={52} className="text-accent" />
+          </motion.div>
+          <h2 className="text-xl font-semibold mb-2" style={{ fontFamily: 'Fraunces, serif' }}>Cooking up ideas...</h2>
+          <p className="text-muted-foreground text-sm max-w-[220px]">
+            {retryCount > 0 ? `Retrying... (attempt ${retryCount + 1})` : 'Our AI chef is crafting recipes tailored to your ingredients'}
+          </p>
+          <div className="flex gap-2 mt-8">
+            {[0, 1, 2].map(i => (
+              <motion.div key={i} className="w-2 h-2 rounded-full bg-accent"
+                animate={{ opacity: [0.25, 1, 0.25] }} transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.22 }} />
+            ))}
+          </div>
+        </div>
+      </MobileLayout>
+    );
+  }
+
+  if (step === 'results') {
+    return (
+      <MobileLayout>
+        <div>
+          <div className="flex items-center gap-3 px-5 pt-14 pb-5">
+            <button onClick={() => setStep('input')} className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center">
+              <ArrowLeft size={17} />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold" style={{ fontFamily: 'Fraunces, serif' }}>Recipe Ideas</h1>
+              <p className="text-xs text-muted-foreground">Based on {ingredients.length} ingredient{ingredients.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
-
-          {/* Recipe Content */}
-          <div className="p-4 space-y-6">
-            {/* Hero Image */}
-            <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-              {recipeImage ? (
-                <img
-                  src={recipeImage}
-                  alt={selectedRecipe.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : generatingRecipeImage ? (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                  <span className="text-sm text-muted-foreground">Generating image...</span>
+          <div className="px-5 space-y-4 pb-6">
+            {generatedRecipes.map((recipe, idx) => (
+              <button key={idx} onClick={() => { setSelectedRecipe(recipe); setSelectedIdx(idx); setStep('detail'); }}
+                className="w-full bg-card rounded-2xl overflow-hidden border border-border hover:border-accent/30 active:scale-[0.99] transition-all text-left">
+                <div className="h-44 bg-muted overflow-hidden">
+                  <img src={recipe.image_url || FALLBACK[idx % FALLBACK.length]} alt={recipe.title} className="w-full h-full object-cover" />
                 </div>
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                  <ChefHat className="h-12 w-12 text-muted-foreground/30" />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => generateRecipeMainImage(selectedRecipe)}
-                  >
-                    <ImagePlus className="h-4 w-4 mr-2" />
-                    Generate Recipe Image
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Title */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                {selectedRecipe.is_quick_meal && <QuickBadge />}
-              </div>
-              <h1 className="text-2xl font-bold">{selectedRecipe.title}</h1>
-              {selectedRecipe.description && (
-                <p className="text-muted-foreground mt-2">{selectedRecipe.description}</p>
-              )}
-            </div>
-
-            {/* Quick Info */}
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{selectedRecipe.cooking_time_minutes} min</span>
-              </div>
-              <Badge variant="secondary">{selectedRecipe.difficulty}</Badge>
-              <span>{selectedRecipe.servings} servings</span>
-            </div>
-
-            {/* Goal Alignment */}
-            {selectedRecipe.goal_alignment.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {selectedRecipe.goal_alignment.map(goal => (
-                  <GoalBadge key={goal} goal={goal} />
-                ))}
-              </div>
-            )}
-
-            {/* Nutrition */}
-            {selectedRecipe.nutrition && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Nutrition</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-5 gap-2 text-center">
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.calories}</p>
-                      <p className="text-xs text-muted-foreground">cal</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.protein}g</p>
-                      <p className="text-xs text-muted-foreground">protein</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.carbs}g</p>
-                      <p className="text-xs text-muted-foreground">carbs</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.fat}g</p>
-                      <p className="text-xs text-muted-foreground">fat</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-semibold">{selectedRecipe.nutrition.fiber}g</p>
-                      <p className="text-xs text-muted-foreground">fiber</p>
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-semibold text-base leading-tight">{recipe.title}</h3>
+                    <span className="flex-shrink-0 text-xs bg-secondary px-2.5 py-1 rounded-full text-muted-foreground">{recipe.difficulty}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{recipe.description}</p>
+                  <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5"><Clock size={12} />{recipe.cooking_time_minutes} min</span>
+                    <span className="flex items-center gap-1.5"><Flame size={12} />{recipe.nutrition.calories} cal</span>
+                    <div className="flex gap-1.5 ml-auto">
+                      {recipe.cuisines.slice(0, 2).map(t => (
+                        <span key={t} className="bg-secondary px-2 py-0.5 rounded-full capitalize">{t}</span>
+                      ))}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Ingredients */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Ingredients</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {selectedRecipe.ingredients.map((ing, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                      <span>
-                        <strong>{ing.amount} {ing.unit}</strong> {ing.name}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="default"
-                size="lg"
-                onClick={() => setCookingMode(true)}
-                className="col-span-2"
-              >
-                <Play className="h-5 w-5 mr-2" />
-                Start Cooking Mode
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => saveRecipe(selectedRecipe)}
-                disabled={savingRecipe}
-                className="col-span-2"
-              >
-                {savingRecipe ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Bookmark className="h-4 w-4 mr-2" />
-                )}
-                Save Recipe
-              </Button>
-            </div>
-
-            {/* Step-by-Step Instructions with Images */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold">Step-by-Step Instructions</h3>
-              <div className="space-y-4">
-                {selectedRecipe.instructions.map((step, idx) => (
-                  <RecipeStepCard
-                    key={idx}
-                    step={step}
-                    recipeTitle={selectedRecipe.title}
-                    ingredients={selectedRecipe.ingredients}
-                    imageUrl={stepImages[step.step]}
-                    isGenerating={generatingStepImage === step.step}
-                    onGenerateImage={() => generateStepImage(step, selectedRecipe)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Save with Image Options */}
-            <div className="space-y-2 pt-4 border-t">
-              <Button 
-                className="w-full" 
-                size="lg"
-                onClick={() => saveRecipe(selectedRecipe, true)}
-                disabled={savingRecipe}
-              >
-                {savingRecipe ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <ImagePlus className="h-4 w-4 mr-2" />
-                )}
-                Save with AI Image
-              </Button>
-            </div>
-          </div>
-        </div>
-      </MobileLayout>
-    );
-  }
-
-  // Loading View
-  if (isGenerating) {
-    return (
-      <MobileLayout>
-        <div className="p-4">
-          <RecipeLoadingSkeleton 
-            message={retryCount > 0 ? `Retrying (attempt ${retryCount + 1})...` : "Creating delicious recipes..."} 
-          />
-        </div>
-      </MobileLayout>
-    );
-  }
-
-  // Generated Recipes View
-  if (generatedRecipes.length > 0) {
-    return (
-      <MobileLayout>
-        <div className="p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" size="sm" onClick={() => setGeneratedRecipes([])}>
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-            <h2 className="font-semibold">Recipe Suggestions</h2>
-            <div className="w-16" />
-          </div>
-
-          <p className="text-sm text-muted-foreground text-center">
-            Here are {generatedRecipes.length} recipes based on your ingredients
-          </p>
-
-          <div className="grid gap-4">
-            {generatedRecipes.map((recipe, idx) => (
-              <RecipeCard
-                key={idx}
-                recipe={{ ...recipe, image_url: previewImages[idx] || recipe.image_url } as unknown as SavedRecipe}
-                onClick={() => setSelectedRecipe({ ...recipe, image_url: previewImages[idx] || recipe.image_url })}
-                isGeneratingImage={false}
-              />
+                </div>
+              </button>
             ))}
+            <button onClick={() => generateRecipes()}
+              className="w-full rounded-2xl border-2 border-dashed border-border py-4 flex items-center justify-center gap-2 text-muted-foreground hover:border-accent hover:text-accent transition-colors">
+              <Sparkles size={16} /><span className="text-sm font-medium">Generate more</span>
+            </button>
           </div>
-
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => generateRecipes()}
-          >
-            <Sparkles className="h-4 w-4 mr-2" />
-            Generate More Recipes
-          </Button>
         </div>
       </MobileLayout>
     );
   }
 
-  // Main Input View
   return (
     <MobileLayout>
-      <div className="p-4 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">What should I cook?</h1>
-          <p className="text-muted-foreground">Add ingredients you have on hand</p>
+      <div>
+        <div className="px-5 pt-14 pb-6">
+          <h1 className="text-4xl leading-tight" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>
+            What should<br />I cook?
+          </h1>
+          <p className="text-muted-foreground mt-2 text-sm">Tell us what you have — we'll do the rest</p>
         </div>
 
-        {/* Craving Input */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Heart className="h-4 w-4 text-primary" />
-            <label className="text-sm font-medium">What are you craving?</label>
+        <div className="px-5 mb-5">
+          <label className="flex items-center gap-1.5 text-sm font-medium mb-2">
+            <Heart size={13} className="text-accent" /> I'm craving...
+          </label>
+          <input type="text" placeholder="pizza, something spicy, comfort food..."
+            value={craving} onChange={e => setCraving(e.target.value)}
+            className="w-full bg-secondary rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/30 placeholder:text-muted-foreground transition-shadow" />
+        </div>
+
+        <div className="px-5 mb-5">
+          <label className="text-sm font-medium block mb-2">Ingredients</label>
+          <div className="flex gap-2">
+            <input type="text" placeholder="Type an ingredient..."
+              value={input} onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addIngredient()}
+              className="flex-1 bg-secondary rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/30 placeholder:text-muted-foreground transition-shadow" />
+            <button onClick={addIngredient} disabled={!input.trim()}
+              className="w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center disabled:opacity-35 hover:opacity-90 active:scale-95 transition-all">
+              <Plus size={18} />
+            </button>
           </div>
-          <Textarea
-            placeholder="e.g., pizza, something spicy, comfort food, tacos..."
-            value={craving}
-            onChange={(e) => setCraving(e.target.value)}
-            className="min-h-[60px] resize-none"
-          />
-          <p className="text-xs text-muted-foreground">
-            We'll get creative with your ingredients to satisfy your craving!
-          </p>
-        </div>
-
-        {/* Ingredient Input */}
-        <div className="space-y-3">
-          <IngredientAutocomplete
-            value={inputValue}
-            onChange={setInputValue}
-            onAddIngredient={addIngredient}
-            existingIngredients={ingredients}
-            placeholder="Type an ingredient..."
-          />
-
-          {/* Add from Pantry */}
-          {!isLoadingPantry && pantryItems.length > 0 && (
-            <Button variant="outline" size="sm" onClick={addFromPantry} className="w-full">
-              <Package className="h-4 w-4 mr-2" />
-              Add from Pantry ({pantryItems.length} items)
-            </Button>
+          {ingredients.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {ingredients.map(ing => (
+                <span key={ing} className="flex items-center gap-1.5 bg-foreground text-primary-foreground text-sm px-3 py-1.5 rounded-full">
+                  {ing}
+                  <button onClick={() => setIngredients(p => p.filter(i => i !== ing))} className="opacity-60 hover:opacity-100">
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Selected Ingredients */}
-        {ingredients.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">{ingredients.length} ingredients</p>
-            <div className="flex flex-wrap gap-2">
-              {ingredients.map((ingredient) => (
-                <Badge
-                  key={ingredient}
-                  variant="secondary"
-                  className="pl-3 pr-1 py-1.5 text-sm cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
-                  onClick={() => removeIngredient(ingredient)}
-                >
-                  {ingredient}
-                  <X className="h-3 w-3 ml-1" />
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Time Selector */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Time available</p>
-            <Button
-              variant={quickMealsOnly ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setQuickMealsOnly(!quickMealsOnly);
-                if (!quickMealsOnly) setSelectedTime(15);
-              }}
-              className={cn(
-                quickMealsOnly && 'bg-quick text-quick-foreground hover:bg-quick/90'
-              )}
-            >
-              <Zap className="h-3 w-3 mr-1 fill-current" />
-              Quick Only
-            </Button>
-          </div>
+        <div className="px-5 mb-6">
+          <label className="flex items-center gap-1.5 text-sm font-medium mb-3"><Timer size={13} /> Time available</label>
           <div className="grid grid-cols-4 gap-2">
-            {TIME_OPTIONS.map((option) => (
-              <Button
-                key={option.value}
-                variant={selectedTime === option.value ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setSelectedTime(option.value);
-                  if (option.value > 15) setQuickMealsOnly(false);
-                }}
-                disabled={quickMealsOnly && option.value > 15}
-                className={cn(
-                  'flex-col h-auto py-2',
-                  selectedTime === option.value && option.value === 15 && 'bg-quick text-quick-foreground hover:bg-quick/90'
-                )}
-              >
-                <Clock className="h-4 w-4 mb-1" />
-                <span className="text-xs">{option.label}</span>
-              </Button>
+            {[{ value: 15, label: '15m', quick: true }, { value: 30, label: '30m', quick: false },
+              { value: 45, label: '45m', quick: false }, { value: 60, label: '1h+', quick: false }].map(({ value, label, quick }) => (
+              <button key={value} onClick={() => { setSelectedTime(value); setQuickMealsOnly(quick); }}
+                className={cn('rounded-xl py-3 text-sm font-medium transition-colors flex flex-col items-center gap-1',
+                  selectedTime === value ? quick ? 'bg-accent text-white' : 'bg-foreground text-primary-foreground' : 'bg-secondary text-foreground')}>
+                {quick && <Zap size={11} className={selectedTime === value ? 'text-white' : 'text-accent'} />}
+                {label}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Generate Button */}
-        <Button 
-          className="w-full" 
-          size="lg"
-          onClick={() => generateRecipes()}
-          disabled={ingredients.length === 0 || isGenerating}
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Generating recipes...
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-5 w-5 mr-2" />
-              Generate Recipes
-            </>
-          )}
-        </Button>
+        <div className="px-5 mb-6">
+          <button onClick={() => setIngredients(p => [...new Set([...p, ...pantryItems.slice(0, 8).map(i => i.name.toLowerCase())])])}
+            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-dashed border-border text-sm text-muted-foreground hover:border-accent hover:text-accent transition-colors">
+            <Package size={15} />
+            {pantryItems.length > 0 ? `Add from pantry (${pantryItems.length} items available)` : 'Add from pantry'}
+          </button>
+        </div>
 
-        {/* Loading Animation */}
-        {isGenerating && (
-          <Card className="animate-pulse-soft">
-            <CardContent className="p-6 text-center">
-              <ChefHat className="h-12 w-12 mx-auto text-primary mb-3 animate-bounce" />
-              <p className="text-sm text-muted-foreground">
-                Our AI chef is cooking up some recipes...
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        <div className="px-5 pb-6">
+          <button onClick={() => generateRecipes()} disabled={ingredients.length === 0}
+            className="w-full bg-foreground text-primary-foreground rounded-2xl py-4 font-semibold flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-35">
+            <Sparkles size={17} /> Generate Recipes
+          </button>
+        </div>
       </div>
     </MobileLayout>
   );

@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { apiGet } from '@/lib/api';
+import { MobileLayout } from '@/components/layout/MobileLayout';
 import {
   ChefHat, Package, Bookmark, ChevronRight,
   Zap, Clock, Flame, TrendingUp, Plus,
@@ -90,15 +91,16 @@ export default function Home() {
   // Show a minimal loading state while profile loads to prevent flash
   if (profileLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
+      <MobileLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        </div>
+      </MobileLayout>
     );
   }
 
   return (
-    <div className="pb-20">
-
+    <MobileLayout>
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="px-5 pt-14 pb-6">
         <p className="text-muted-foreground text-sm font-medium tracking-wide uppercase">
@@ -323,7 +325,7 @@ export default function Home() {
           </button>
           <button
             onClick={() => navigate('/cook')}
-            className="bg-accent text-accent-foreground rounded-2xl p-4 text-left hover:opacity-90 transition-opacity"
+            className="bg-foreground text-primary-foreground rounded-2xl p-4 text-left hover:opacity-90 transition-opacity"
           >
             <Zap size={18} className="mb-3" />
             <p className="font-semibold text-sm">Quick Meals</p>
@@ -331,7 +333,6 @@ export default function Home() {
           </button>
         </div>
       </div>
-
-    </div>
+    </MobileLayout>
   );
 }

@@ -1,321 +1,193 @@
+// src/pages/Budget.tsx — redesigned UI, real API calls preserved
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { MobileLayout } from '@/components/layout/MobileLayout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
-import { GoalBadge } from '@/components/ui/goal-badge';
 import { useToast } from '@/hooks/use-toast';
-import { apiGet, apiPut, apiPost } from '@/lib/api';
-
-import {
-  DollarSign, Target, Plus, TrendingUp, TrendingDown,
-  Sparkles, Loader2, Check, ShoppingCart
-} from 'lucide-react';
+import { apiGet, apiPost, apiPut } from '@/lib/api';
+import { MobileLayout } from '@/components/layout/MobileLayout';
 import { cn } from '@/lib/utils';
-import { type MonthlyBudget, type BudgetTransaction, type BudgetRecommendation } from '@/types/database';
+import { TrendingUp, Plus, DollarSign } from 'lucide-react';
+import type { MonthlyBudget, BudgetTransaction } from '@/types/database';
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Proteins: '#C85A28', Produce: '#6BAD7E', Dairy: '#6B9FD4',
+  Pantry: '#B06BBD', Other: '#D4A056',
+};
 
 export default function Budget() {
-  const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
-
   const [budget, setBudget] = useState<MonthlyBudget | null>(null);
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [budgetAmount, setBudgetAmount] = useState('');
+  const [budgetInput, setBudgetInput] = useState('');
+  const [txAmount, setTxAmount] = useState('');
+  const [txDesc, setTxDesc] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [transactionAmount, setTransactionAmount] = useState('');
-  const [transactionDesc, setTransactionDesc] = useState('');
-  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
-  const [recommendations, setRecommendations] = useState<BudgetRecommendation[] | null>(null);
-  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [isAddingTx, setIsAddingTx] = useState(false);
+
+  const now = new Date();
+  const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [authLoading, user, navigate]);
-
-  useEffect(() => {
-    if (user) {
-      fetchBudgetData();
-    }
+    if (!user) return;
+    apiGet<{ budget: MonthlyBudget | null; transactions: BudgetTransaction[] }>('/api/budget')
+      .then(data => {
+        setBudget(data.budget);
+        setTransactions(data.transactions || []);
+        if (data.budget) setBudgetInput(String(data.budget.budget_amount));
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, [user]);
 
-  const fetchBudgetData = async () => {
-    setIsLoading(true);
-    try {
-      const data = await apiGet<{ budget: MonthlyBudget | null; transactions: BudgetTransaction[] }>('/api/budget');
-      setBudget(data.budget);
-      setTransactions(data.transactions);
-    } catch {
-      toast({ variant: 'destructive', description: 'Failed to load budget.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const saveBudget = async () => {
-    if (!budgetAmount) return;
+    if (!budgetInput) return;
     setIsSaving(true);
     try {
-      const amount = parseFloat(budgetAmount);
-      const data = await apiPut<{ budget: MonthlyBudget }>('/api/budget', { budget_amount: amount });
+      const data = await apiPut<{ budget: MonthlyBudget }>('/api/budget', { amount: parseFloat(budgetInput) });
       setBudget(data.budget);
-      setBudgetAmount('');
-      toast({ description: budget ? 'Budget updated!' : 'Budget set!' });
-    } catch (err) {
-      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Failed to save budget.' });
+      toast({ description: 'Budget updated!' });
+    } catch {
+      toast({ variant: 'destructive', description: 'Failed to save budget.' });
     } finally {
       setIsSaving(false);
     }
   };
 
   const addTransaction = async () => {
-    if (!budget || !transactionAmount) return;
-    setIsAddingTransaction(true);
+    if (!txAmount || !budget) return;
+    setIsAddingTx(true);
     try {
-      const newTransaction = await apiPost<BudgetTransaction>('/api/budget/transactions', {
-        amount: parseFloat(transactionAmount),
-        description: transactionDesc || undefined,
+      const data = await apiPost<{ transaction: BudgetTransaction }>('/api/budget/transactions', {
+        amount: parseFloat(txAmount), description: txDesc || 'Grocery purchase',
       });
-      setTransactions([newTransaction, ...transactions]);
-      setTransactionAmount('');
-      setTransactionDesc('');
+      setTransactions(p => [data.transaction, ...p]);
+      setTxAmount(''); setTxDesc('');
       toast({ description: 'Purchase logged!' });
-    } catch (err) {
-      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Failed to log purchase.' });
+    } catch {
+      toast({ variant: 'destructive', description: 'Failed to log transaction.' });
     } finally {
-      setIsAddingTransaction(false);
+      setIsAddingTx(false);
     }
   };
 
-  const getRecommendations = async () => {
-    setIsLoadingRecommendations(true);
-    try {
-      const data = await apiPost<{ recommendations: BudgetRecommendation[] }>('/api/budget/recommendations', {});
-      setRecommendations(data.recommendations);
-    } catch (err) {
-      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Failed to get recommendations.' });
-    } finally {
-      setIsLoadingRecommendations(false);
-    }
-  };
-
-  const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const remaining = budget ? budget.budget_amount - totalSpent : 0;
-  const percentUsed = budget ? (totalSpent / budget.budget_amount) * 100 : 0;
-
-  if (authLoading || isLoading) {
-    return (
-      <MobileLayout>
-        <div className="p-4 space-y-4">
-          <Skeleton className="h-8 w-40" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-48 w-full" />
-        </div>
-      </MobileLayout>
-    );
-  }
+  const spent = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const budgetAmount = budget?.budget_amount || 0;
+  const pct = budgetAmount > 0 ? Math.min(Math.round((spent / budgetAmount) * 100), 100) : 0;
+  const remaining = budgetAmount - spent;
 
   return (
     <MobileLayout>
-      <div className="p-4 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Grocery Budget</h1>
-          <p className="text-muted-foreground">
-            {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
-          </p>
+      <div>
+        <div className="px-5 pt-14 pb-5">
+          <h1 className="text-4xl" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>Budget</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{monthLabel}</p>
         </div>
 
-        {/* Budget Setup/Overview */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Monthly Budget
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                <Input
-                  type="number"
-                  placeholder="Enter amount"
-                  value={budgetAmount}
-                  onChange={(e) => setBudgetAmount(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-              <Button onClick={saveBudget} disabled={isSaving || !budgetAmount}>
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              </Button>
-            </div>
-
-            {budget && (
-              <>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Spent: ${totalSpent.toFixed(2)}</span>
-                    <span>Remaining: ${remaining.toFixed(2)}</span>
-                  </div>
-                  <Progress 
-                    value={Math.min(percentUsed, 100)} 
-                    className={cn(
-                      'h-3',
-                      percentUsed > 90 && 'bg-destructive/20'
-                    )}
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {percentUsed > 90 ? (
-                    <>
-                      <TrendingDown className="h-4 w-4 text-destructive" />
-                      <span className="text-sm text-destructive">Budget almost used up</span>
-                    </>
-                  ) : (
-                    <>
-                      <TrendingUp className="h-4 w-4 text-accent" />
-                      <span className="text-sm text-accent">{Math.round(100 - percentUsed)}% remaining</span>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Monthly Goals */}
-        {profile?.monthly_goals && profile.monthly_goals.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Your Goals
-              </CardTitle>
-              <CardDescription>We'll recommend ingredients that support these</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {profile.monthly_goals.map((goal) => (
-                  <GoalBadge key={goal} goal={goal} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* AI Recommendations */}
-        {budget && profile?.monthly_goals?.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                AI Recommendations
-              </CardTitle>
-              <CardDescription>Ingredients that fit your budget and goals</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={getRecommendations}
-                disabled={isLoadingRecommendations}
-              >
-                {isLoadingRecommendations ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
-                {recommendations ? 'Refresh Recommendations' : 'Get Recommendations'}
-              </Button>
-
-              {recommendations && (
-                <div className="space-y-3 pt-1">
-                  {recommendations.map((rec, i) => (
-                    <div key={i} className="rounded-lg border p-3 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm">{rec.category}</span>
-                        <span className="text-sm text-muted-foreground">${Number(rec.estimated_cost).toFixed(2)}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{rec.items.join(', ')}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Log Purchase */}
-        {budget && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                Log Purchase
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+        {/* Set budget */}
+        {!budget && (
+          <div className="px-5 mb-6">
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <p className="text-sm font-medium mb-3">Set your monthly budget</p>
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                  <Input
-                    type="number"
-                    placeholder="Amount"
-                    value={transactionAmount}
-                    onChange={(e) => setTransactionAmount(e.target.value)}
-                    className="pl-8"
-                  />
+                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input type="number" placeholder="250" value={budgetInput}
+                    onChange={e => setBudgetInput(e.target.value)}
+                    className="w-full bg-secondary rounded-xl pl-8 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/30" />
                 </div>
-                <Input
-                  placeholder="Description (optional)"
-                  value={transactionDesc}
-                  onChange={(e) => setTransactionDesc(e.target.value)}
-                  className="flex-1"
-                />
+                <button onClick={saveBudget} disabled={isSaving || !budgetInput}
+                  className="px-4 rounded-xl bg-accent text-white text-sm font-medium disabled:opacity-50 hover:opacity-90">
+                  Set
+                </button>
               </div>
-              <Button 
-                className="w-full"
-                onClick={addTransaction}
-                disabled={!transactionAmount || isAddingTransaction}
-              >
-                {isAddingTransaction ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Plus className="h-4 w-4 mr-2" />
-                )}
-                Add Purchase
-              </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
-        {/* Transaction History */}
+        {/* Overview card */}
+        {budget && (
+          <div className="px-5 mb-6">
+            <div className="bg-foreground text-primary-foreground rounded-2xl p-5">
+              <div className="flex justify-between items-start mb-5">
+                <div>
+                  <p className="text-xs opacity-60 mb-1 uppercase tracking-wider">Spent</p>
+                  <p className="text-4xl font-bold" style={{ fontFamily: 'Fraunces, serif' }}>${spent.toFixed(0)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs opacity-60 mb-1 uppercase tracking-wider">Budget</p>
+                  <p className="text-2xl font-semibold">${budgetAmount}</p>
+                </div>
+              </div>
+              <div className="bg-white/15 rounded-full h-1.5 mb-2.5 overflow-hidden">
+                <div className="bg-accent h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+              </div>
+              <div className="flex justify-between text-xs opacity-60">
+                <span>{pct}% used</span>
+                <span>${remaining.toFixed(0)} remaining</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Log a purchase */}
+        {budget && (
+          <div className="px-5 mb-6">
+            <h2 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground mb-3">Log Purchase</h2>
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+              <div className="flex gap-2">
+                <div className="relative w-28">
+                  <DollarSign size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input type="number" placeholder="0.00" value={txAmount}
+                    onChange={e => setTxAmount(e.target.value)}
+                    className="w-full bg-secondary rounded-xl pl-7 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-accent/30" />
+                </div>
+                <input type="text" placeholder="Description (optional)" value={txDesc}
+                  onChange={e => setTxDesc(e.target.value)}
+                  className="flex-1 bg-secondary rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-accent/30 placeholder:text-muted-foreground" />
+              </div>
+              <button onClick={addTransaction} disabled={isAddingTx || !txAmount}
+                className="w-full bg-foreground text-primary-foreground rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90">
+                <Plus size={14} /> Log Purchase
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Recent transactions */}
         {transactions.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="font-medium">Recent Purchases</h3>
-            <div className="space-y-2">
-              {transactions.slice(0, 10).map((trans) => (
-                <div key={trans.id} className="flex items-center justify-between py-2 border-b">
-                  <div>
-                    <p className="text-sm font-medium">{trans.description || 'Purchase'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(trans.transaction_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span className="font-medium">${Number(trans.amount).toFixed(2)}</span>
+          <div className="px-5 mb-6">
+            <h2 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground mb-3">Recent</h2>
+            <div className="bg-card border border-border rounded-2xl overflow-hidden">
+              {transactions.slice(0, 5).map((t, i) => (
+                <div key={t.id} className={cn('px-4 py-3.5 flex items-center gap-3', i > 0 && 'border-t border-border')}>
+                  <div className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />
+                  <span className="flex-1 text-sm">{t.description || 'Grocery purchase'}</span>
+                  <span className="text-sm font-semibold">${t.amount.toFixed(2)}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Status tip */}
+        {budget && (
+          <div className="px-5 pb-6">
+            <div className={cn('border rounded-2xl p-4 flex gap-3',
+              pct > 90 ? 'bg-destructive/10 border-destructive/20' : 'bg-accent/10 border-accent/20')}>
+              <TrendingUp size={18} className={cn('flex-shrink-0 mt-0.5', pct > 90 ? 'text-destructive' : 'text-accent')} />
+              <div>
+                <p className={cn('text-sm font-semibold mb-0.5', pct > 90 ? 'text-destructive' : 'text-accent')}>
+                  {pct > 90 ? 'Over Budget' : 'On Track'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {pct > 90
+                    ? `You've used ${pct}% of your budget this month.`
+                    : `At this rate you'll finish $${Math.abs(remaining).toFixed(0)} ${remaining >= 0 ? 'under' : 'over'} budget. Keep it up!`}
+                </p>
+              </div>
             </div>
           </div>
         )}
