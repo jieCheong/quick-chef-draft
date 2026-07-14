@@ -1,7 +1,8 @@
 // This file returns this week's active viral recipes
 // this route is public, no requireAuth middleware
-// I control the content by inserting rows into viral_recipes table in Neon
-// Set active=true for recipes I want shown this week.
+// Content is fully automated: rotateViralRecipesIfStale() (see
+// lib/rotateViralRecipes.ts) generates 3 new AI recipes and flips
+// active=true on them whenever the current batch turns 7+ days old.
 
 import { Router, Request, Response } from "express";
 import pool from '../db';
@@ -12,12 +13,13 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
         const result = await pool.query(
             `SELECT
                 id, title, description, image_url,
+                cooking_time_minutes, difficulty,
                 ingredients, instructions, nutrition,
                 tags, week_start, week_end, created_at
                 FROM viral_recipes
                 WHERE active = true
                 ORDER BY created_at DESC
-                LIMIT 10`
+                LIMIT 3`
         );
         res.json(result.rows);
     } catch (error) {

@@ -6,18 +6,19 @@ import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, apiPost } from '@/lib/api';
 import { MobileLayout } from '@/components/layout/MobileLayout';
+import { IngredientAutocomplete } from '@/components/cook/IngredientAutocomplete';
 import { cn } from '@/lib/utils';
 import type { PantryItem, SavedRecipe } from '@/types/database';
 import {
-  ChefHat, Plus, X, Sparkles, ArrowLeft, Heart,
+  ChefHat, X, Sparkles, ArrowLeft, Heart,
   Timer, Zap, Package, Clock, Flame, Leaf, Star,
-  Bookmark, Play,
+  Bookmark, Play, Loader2, Image as ImageIcon,
 } from 'lucide-react';
 
 type CookStep = 'input' | 'generating' | 'results' | 'detail';
 
 interface RecipeIngredient { name: string; amount: string; unit: string; }
-interface RecipeInstruction { step: number; instruction: string; duration_minutes?: number; }
+interface RecipeInstruction { step: number; instruction: string; duration_minutes?: number; image_url?: string | null; }
 interface RecipeNutrition { calories: number; protein: number; carbs: number; fat: number; fiber: number; }
 interface GeneratedRecipe {
   title: string; description: string; cooking_time_minutes: number;
@@ -38,11 +39,59 @@ function RecipeDetail({ recipe, idx, onBack, onSave, saving }: {
   recipe: GeneratedRecipe; idx: number; onBack: () => void;
   onSave: (r: GeneratedRecipe) => void; saving: boolean;
 }) {
+  const { toast } = useToast();
   const [tab, setTab] = useState<'ingredients' | 'steps'>('ingredients');
   const [saved, setSaved] = useState(false);
+  const [stepImages, setStepImages] = useState<Record<number, string>>({});
+  const [generatingSteps, setGeneratingSteps] = useState<Set<number>>(new Set());
   const img = recipe.image_url || FALLBACK[idx % FALLBACK.length];
 
-  const handleSave = () => { if (saved) return; setSaved(true); onSave(recipe); };
+  const generateStepImage = async (s: RecipeInstruction) => {
+    setGeneratingSteps(prev => new Set(prev).add(s.step));
+    try {
+      const data = await apiPost<{ image_url: string }>('/api/generate-image', {
+        recipeTitle: recipe.title,
+        stepInstruction: s.instruction,
+        stepNumber: s.step,
+      });
+      setStepImages(prev => ({ ...prev, [s.step]: data.image_url }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate image.';
+      toast({ variant: 'destructive', description: message });
+    } finally {
+      setGeneratingSteps(prev => {
+        const next = new Set(prev);
+        next.delete(s.step);
+        return next;
+      });
+    }
+  };
+
+  // Auto-generate every step's image as soon as the user opens the Steps
+  // tab, rather than waiting for a per-step button click. Guarded by
+  // stepImages/generatingSteps so switching tabs back and forth doesn't
+  // re-trigger already-done or in-flight steps.
+  useEffect(() => {
+    if (tab !== 'steps') return;
+    recipe.instructions.forEach(s => {
+      if (!stepImages[s.step] && !s.image_url && !generatingSteps.has(s.step)) {
+        generateStepImage(s);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const handleSave = () => {
+    if (saved) return;
+    setSaved(true);
+    const withStepImages: GeneratedRecipe = {
+      ...recipe,
+      instructions: recipe.instructions.map(s =>
+        stepImages[s.step] ? { ...s, image_url: stepImages[s.step] } : s
+      ),
+    };
+    onSave(withStepImages);
+  };
 
   return (
     <MobileLayout showNav={false}>
@@ -112,13 +161,32 @@ function RecipeDetail({ recipe, idx, onBack, onSave, saving }: {
               ))}
             </div>
           ) : (
-            <div className="space-y-4 mb-6">
-              {recipe.instructions.map((s, i) => (
-                <div key={i} className="flex gap-3.5">
-                  <div className="w-7 h-7 rounded-full bg-accent text-white flex-shrink-0 flex items-center justify-center text-xs font-bold">{s.step}</div>
-                  <p className="text-sm leading-relaxed pt-1">{s.instruction}</p>
-                </div>
-              ))}
+            <div className="space-y-5 mb-6">
+              {recipe.instructions.map((s, i) => {
+                const stepImg = stepImages[s.step] || s.image_url;
+                return (
+                  <div key={i} className="space-y-2.5">
+                    <div className="flex gap-3.5">
+                      <div className="w-7 h-7 rounded-full bg-accent text-white flex-shrink-0 flex items-center justify-center text-xs font-bold">{s.step}</div>
+                      <p className="text-sm leading-relaxed pt-1">{s.instruction}</p>
+                    </div>
+                    {stepImg ? (
+                      <img src={stepImg} alt={`Step ${s.step}`} className="w-full h-40 object-cover rounded-xl" />
+                    ) : generatingSteps.has(s.step) ? (
+                      <div className="w-full h-40 rounded-xl bg-secondary flex items-center justify-center">
+                        <Loader2 size={20} className="animate-spin text-accent" />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => generateStepImage(s)}
+                        className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-medium text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <ImageIcon size={13} /> Generate image
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -155,8 +223,8 @@ export default function Cook() {
     apiGet<PantryItem[]>('/api/pantry').then(setPantryItems).catch(() => {});
   }, [user]);
 
-  const addIngredient = () => {
-    const t = input.trim().toLowerCase();
+  const addIngredient = (value?: string) => {
+    const t = (value ?? input).trim().toLowerCase();
     if (t && !ingredients.includes(t)) setIngredients(p => [...p, t]);
     setInput('');
   };
@@ -306,16 +374,13 @@ export default function Cook() {
 
         <div className="px-5 mb-5">
           <label className="text-sm font-medium block mb-2">Ingredients</label>
-          <div className="flex gap-2">
-            <input type="text" placeholder="Type an ingredient..."
-              value={input} onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addIngredient()}
-              className="flex-1 bg-secondary rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/30 placeholder:text-muted-foreground transition-shadow" />
-            <button onClick={addIngredient} disabled={!input.trim()}
-              className="w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center disabled:opacity-35 hover:opacity-90 active:scale-95 transition-all">
-              <Plus size={18} />
-            </button>
-          </div>
+          <IngredientAutocomplete
+            value={input}
+            onChange={setInput}
+            onAddIngredient={addIngredient}
+            existingIngredients={ingredients}
+            placeholder="Type an ingredient..."
+          />
           {ingredients.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-3">
               {ingredients.map(ing => (

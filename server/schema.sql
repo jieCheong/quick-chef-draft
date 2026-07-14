@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS usage_daily (
     date             DATE NOT NULL DEFAULT CURRENT_DATE,
     generations_used INT DEFAULT 0,
     max_generations  INT DEFAULT 2,
+    images_used      INT DEFAULT 0,
+    max_images       INT DEFAULT 20,
     created_at       TIMESTAMPTZ DEFAULT NOW(),
     updated_at       TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, date)
@@ -130,18 +132,20 @@ CREATE TABLE IF NOT EXISTS budget_transactions (
 -- 2. Control which ones are currently visible from the db
 -- 3. Update content wo redeploying the app
 CREATE TABLE IF NOT EXISTS viral_recipes (
-    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title          VARCHAR(255) NOT NULL,
-    description    TEXT,
-    image_url      TEXT,
-    ingredients    JSONB NOT NULL,
-    instructions   JSONB NOT NULL,
-    nutrition      JSONB,
-    tags           TEXT[] DEFAULT '{}',
-    week_start     DATE NOT NULL,
-    week_end       DATE NOT NULL,
-    active         BOOLEAN DEFAULT FALSE,
-    created_at     TIMESTAMPTZ DEFAULT NOW()
+    id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title                VARCHAR(255) NOT NULL,
+    description          TEXT,
+    image_url            TEXT,
+    cooking_time_minutes INT,
+    difficulty           VARCHAR(20),
+    ingredients          JSONB NOT NULL,
+    instructions         JSONB NOT NULL,
+    nutrition            JSONB,
+    tags                 TEXT[] DEFAULT '{}',
+    week_start           DATE NOT NULL,
+    week_end             DATE NOT NULL,
+    active               BOOLEAN DEFAULT FALSE,
+    created_at           TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes

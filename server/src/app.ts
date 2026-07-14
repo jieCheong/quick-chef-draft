@@ -9,6 +9,7 @@ import profileRouter from './routes/profile';
 import pantryRouter from './routes/pantry';
 import recipesRouter from './routes/recipes';
 import generateRouter from './routes/generate';
+import generateImageRouter from './routes/generateImage';
 import viralRouter from './routes/viral';
 import budgetRouter from './routes/budget';
 
@@ -67,6 +68,7 @@ export function buildApp(): Express {
   app.use('/api/pantry', pantryRouter);
   app.use('/api/recipes', recipesRouter);
   app.use('/api/generate-recipe', generateRouter);
+  app.use('/api/generate-image', generateImageRouter);
   app.use('/api/viral-recipes', viralRouter);
   app.use('/api/budget', budgetRouter);
 

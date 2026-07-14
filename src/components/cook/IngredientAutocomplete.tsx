@@ -1,7 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -195,8 +192,9 @@ export function IngredientAutocomplete({
   return (
     <div className={cn("relative flex gap-2", className)}>
       <div className="relative flex-1">
-        <Input
+        <input
           ref={inputRef}
+          type="text"
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -204,52 +202,51 @@ export function IngredientAutocomplete({
           onFocus={() => {
             if (suggestions.length > 0) setIsOpen(true);
           }}
-          className="w-full"
           autoComplete="off"
+          className="w-full bg-secondary rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-accent/30 placeholder:text-muted-foreground transition-shadow"
         />
-        
+
         {/* Dropdown */}
         {isOpen && suggestions.length > 0 && (
           <div
             ref={dropdownRef}
-            className="absolute top-full left-0 right-0 mt-1 z-50 bg-popover border border-border rounded-md shadow-lg overflow-hidden"
+            className="absolute top-full left-0 right-0 mt-2 z-50 bg-card border border-border rounded-xl shadow-lg overflow-hidden"
           >
-            <ScrollArea className="max-h-[200px]">
-              <div className="p-1">
-                {suggestions.map((suggestion, index) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => handleSelectSuggestion(suggestion)}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                    className={cn(
-                      "w-full text-left px-3 py-2 text-sm rounded-sm transition-colors",
-                      "hover:bg-accent hover:text-accent-foreground",
-                      index === highlightedIndex && "bg-accent text-accent-foreground"
-                    )}
-                  >
-                    {/* Highlight matching part */}
-                    {highlightMatch(suggestion, value)}
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
+            <div className="max-h-[200px] overflow-y-auto p-1">
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => handleSelectSuggestion(suggestion)}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 text-sm rounded-lg transition-colors capitalize",
+                    "hover:bg-secondary",
+                    index === highlightedIndex && "bg-accent/10 text-accent"
+                  )}
+                >
+                  {/* Highlight matching part */}
+                  {highlightMatch(suggestion, value)}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
-      
-      <Button 
-        size="icon" 
+
+      <button
+        type="button"
         onClick={() => {
           if (value.trim()) {
             onAddIngredient(value.trim());
             onChange('');
           }
-        }} 
+        }}
         disabled={!value.trim() || isLoading}
+        className="w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center disabled:opacity-35 hover:opacity-90 active:scale-95 transition-all flex-shrink-0"
       >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-      </Button>
+        {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+      </button>
     </div>
   );
 }
@@ -267,7 +264,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, index)}
-      <span className="font-semibold text-primary">
+      <span className="font-semibold text-accent">
         {text.slice(index, index + lowerQuery.length)}
       </span>
       {text.slice(index + lowerQuery.length)}

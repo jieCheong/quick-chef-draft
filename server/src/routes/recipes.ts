@@ -79,6 +79,38 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     }
 });
 
+// patch
+// Called from Saved.tsx when a step image is generated for an
+// already-saved recipe, so the image persists instead of being
+// regenerated (and re-billed) every time the recipe is viewed.
+router.patch('/:id', validate(idParamSchema, 'params'), async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const { instructions } = req.body;
+
+    if (!instructions) {
+        res.status(400).json({ message: 'Instructions are required.' });
+        return;
+    }
+
+    try {
+        const result = await pool.query(
+            `UPDATE saved_recipes
+             SET instructions = $1, updated_at = NOW()
+             WHERE id = $2 AND user_id = $3
+             RETURNING *`,
+            [JSON.stringify(instructions), id, req.userId]
+        );
+        if (result.rows.length === 0) {
+            res.status(404).json({ message: 'Recipe not found.' });
+            return;
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('PATCH /api/recipes/:id error:', error);
+        res.status(500).json({ message: 'Failed to update recipe.' });
+    }
+});
+
 // delete
 router.delete('/:id', validate(idParamSchema, 'params'), async (req: Request, res: Response): Promise<void> => {
     const {id} = req.params;

@@ -1,10 +1,10 @@
 // Custom type definitions for the app
 
-export type DietaryStyle = 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'halal' | 'kosher';
+export type DietaryStyle = 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo';
 
 export type SkillLevel = 'beginner' | 'intermediate' | 'advanced';
 
-export type MonthlyGoal = 'keto' | 'try_different_cuisines' | 'eat_more_veggies' | 'more_protein' | 'more_fiber';
+export type MonthlyGoal = 'high_protein' | 'lose_weight' | 'gain_muscle' | 'low_calorie' | 'budget_friendly' | 'quick_meals' | 'meal_prep';
 
 export type IngredientCategory = 'proteins' | 'vegetables' | 'fruits' | 'dairy' | 'grains' | 'spices' | 'condiments' | 'other';
 
@@ -42,6 +42,7 @@ export interface RecipeIngredient {
 export interface RecipeInstruction {
   step: number;
   instruction: string;
+  image_url?: string | null;
 }
 
 export interface RecipeNutrition {
@@ -103,8 +104,7 @@ export const DIETARY_STYLES: { value: DietaryStyle; label: string }[] = [
   { value: 'vegan', label: 'Vegan' },
   { value: 'pescatarian', label: 'Pescatarian' },
   { value: 'keto', label: 'Keto' },
-  { value: 'halal', label: 'Halal' },
-  { value: 'kosher', label: 'Kosher' },
+  { value: 'paleo', label: 'Paleo' },
 ];
 
 export const SKILL_LEVELS: { value: SkillLevel; label: string; description: string }[] = [
@@ -114,11 +114,13 @@ export const SKILL_LEVELS: { value: SkillLevel; label: string; description: stri
 ];
 
 export const MONTHLY_GOALS: { value: MonthlyGoal; label: string; emoji: string; color: string }[] = [
-  { value: 'keto', label: 'Keto diet', emoji: '🥑', color: 'goal-keto' },
-  { value: 'try_different_cuisines', label: 'Try different cuisines', emoji: '🌍', color: 'goal-cuisines' },
-  { value: 'eat_more_veggies', label: 'Eat more veggies', emoji: '🥬', color: 'goal-veggies' },
-  { value: 'more_protein', label: 'More protein', emoji: '💪', color: 'goal-protein' },
-  { value: 'more_fiber', label: 'More fiber', emoji: '🌾', color: 'goal-fiber' },
+  { value: 'high_protein', label: 'High protein', emoji: '💪', color: 'goal-protein' },
+  { value: 'lose_weight', label: 'Lose weight', emoji: '⚖️', color: 'goal-veggies' },
+  { value: 'gain_muscle', label: 'Gain muscle', emoji: '🏋️', color: 'goal-protein' },
+  { value: 'low_calorie', label: 'Low calorie', emoji: '🥗', color: 'goal-veggies' },
+  { value: 'budget_friendly', label: 'Budget friendly', emoji: '💰', color: 'goal-cuisines' },
+  { value: 'quick_meals', label: 'Quick meals', emoji: '⚡', color: 'goal-keto' },
+  { value: 'meal_prep', label: 'Meal prep', emoji: '🍱', color: 'goal-fiber' },
 ];
 
 export const CUISINES = [
