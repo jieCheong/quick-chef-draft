@@ -57,13 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const restoreSession = async () => {
-      const token = getToken();
-
-      if (!token) {
-        setLoading(false);
-        return;
-      }
       try {
+        const token = getToken();
+
+        if (!token) {
+          setLoading(false);
+          return;
+        }
         const data = await apiGet<MeResponse>('/api/auth/me');
         setUser(data.user);
       } catch {
