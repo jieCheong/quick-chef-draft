@@ -45,14 +45,23 @@ export function buildApp(): Express {
     })
   );
 
+  // Matches any Vercel deployment for this project (production, previews,
+  // and branch deploys like quick-chef-draft-git-<branch>-*.vercel.app) so
+  // CORS doesn't need to be updated by hand every time a new branch/preview
+  // URL is generated.
+  const VERCEL_PROJECT_ORIGIN = /^https:\/\/quick-chef-draft(-[a-z0-9-]+)?\.vercel\.app$/;
+
   app.use(cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       const allowed = (process.env.CORS_ORIGIN || 'http://localhost:5173')
         .split(',')
         .map((o) => o.trim());
-      if (allowed.includes(origin)) callback(null, true);
-      else callback(new Error(`CORS blocked: ${origin}`));
+      if (allowed.includes(origin) || VERCEL_PROJECT_ORIGIN.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
     },
     credentials: true,
   }));
