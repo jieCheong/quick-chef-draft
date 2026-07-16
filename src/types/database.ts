@@ -68,6 +68,7 @@ export interface SavedRecipe {
   cuisines: string[];
   goal_alignment: MonthlyGoal[];
   is_quick_meal: boolean;
+  is_trending: boolean;
   created_at: string;
   updated_at: string;
 }

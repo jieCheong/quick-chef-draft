@@ -19,7 +19,7 @@ const FALLBACK = [
   'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&auto=format',
 ];
 
-const FILTERS = ['All', 'Quick', 'Easy', 'Healthy'];
+const FILTERS = ['All', 'Quick', 'Trendy', 'Healthy'];
 
 function SavedRecipeDetail({ recipe, idx, onBack, onDelete, onInstructionsUpdated }: {
   recipe: SavedRecipe; idx: number; onBack: () => void;
@@ -248,7 +248,7 @@ export default function SavedRecipes() {
 
   const displayed = filter === 'All' ? recipes
     : filter === 'Quick' ? recipes.filter(r => r.is_quick_meal)
-    : filter === 'Easy' ? recipes.filter(r => r.difficulty?.toLowerCase() === 'easy')
+    : filter === 'Trendy' ? recipes.filter(r => r.is_trending)
     : recipes.filter(r => r.goal_alignment?.some(g => g.toLowerCase().includes('protein') || g.toLowerCase().includes('calorie')));
 
   if (selectedRecipe) {
@@ -322,6 +322,9 @@ export default function SavedRecipes() {
                     ))}
                     {recipe.is_quick_meal && (
                       <span className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-full">Quick</span>
+                    )}
+                    {recipe.is_trending && (
+                      <span className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-full">Trendy</span>
                     )}
                   </div>
                 </div>

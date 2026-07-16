@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS saved_recipes (
     cuisines        TEXT[] DEFAULT '{}',
     goal_alignment   TEXT[] DEFAULT '{}',
     is_quick_meal     BOOLEAN DEFAULT FALSE,
+    is_trending       BOOLEAN DEFAULT FALSE,
     ingredients    JSONB NOT NULL,
     instructions   JSONB NOT NULL,
     nutrition      JSONB,

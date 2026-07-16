@@ -37,6 +37,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         cuisines,
         goal_alignment,
         is_quick_meal,
+        is_trending,
         ingredients,
         instructions,
         nutrition
@@ -51,10 +52,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             `INSERT INTO saved_recipes (
             user_id, title, description, image_url,
             cooking_time_minutes, difficulty, servings,
-            cuisines, goal_alignment, is_quick_meal,
+            cuisines, goal_alignment, is_quick_meal, is_trending,
             ingredients, instructions, nutrition
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *`,
         [
             req.userId,
@@ -67,6 +68,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             cuisines || [],
             goal_alignment || [],
             is_quick_meal || false,
+            is_trending || false,
             JSON.stringify(ingredients),
             JSON.stringify(instructions),
             nutrition ? JSON.stringify(nutrition) : null,

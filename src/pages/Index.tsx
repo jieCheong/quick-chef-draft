@@ -99,6 +99,7 @@ function ViralRecipeDetail({ recipe, idx, onBack }: {
         cuisines: recipe.tags,
         goal_alignment: [],
         is_quick_meal: (recipe.cooking_time_minutes ?? 999) <= 15,
+        is_trending: true,
         ingredients: recipe.ingredients,
         instructions,
         nutrition: recipe.nutrition,
@@ -314,13 +315,16 @@ export default function Home() {
       {/* ── Quick stats ─────────────────────────────────────────────────────── */}
       <div className="px-5 mb-6">
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-card border border-border rounded-2xl p-3.5">
+          <button
+            onClick={() => navigate('/saved')}
+            className="bg-card border border-border rounded-2xl p-3.5 text-left hover:border-accent/30 active:scale-[0.98] transition-all"
+          >
             <div className="text-muted-foreground mb-2">
               <Bookmark size={15} />
             </div>
             <p className="text-xl font-bold">{recentRecipes.length > 0 ? recentRecipes.length : '—'}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Saved</p>
-          </div>
+          </button>
           <div className="bg-card border border-border rounded-2xl p-3.5">
             <div className="text-muted-foreground mb-2">
               <Zap size={15} />
@@ -328,13 +332,16 @@ export default function Home() {
             <p className="text-xl font-bold">2</p>
             <p className="text-xs text-muted-foreground mt-0.5">Daily left</p>
           </div>
-          <div className="bg-card border border-border rounded-2xl p-3.5">
+          <button
+            onClick={() => document.getElementById('trending-section')?.scrollIntoView({ behavior: 'smooth' })}
+            className="bg-card border border-border rounded-2xl p-3.5 text-left hover:border-accent/30 active:scale-[0.98] transition-all"
+          >
             <div className="text-muted-foreground mb-2">
               <TrendingUp size={15} />
             </div>
             <p className="text-xl font-bold">{viralRecipes.length}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Trending</p>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -404,7 +411,7 @@ export default function Home() {
 
       {/* ── Trending This Week ──────────────────────────────────────────────── */}
       {(loadingViral || viralRecipes.length > 0) && (
-        <div className="mb-6">
+        <div id="trending-section" className="mb-6 scroll-mt-6">
           <div className="px-5 mb-3">
             <h2 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground">
               Trending This Week
