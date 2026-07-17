@@ -222,3 +222,100 @@ describe('POST /api/auth/login', () => {
     );
   });
 });
+
+// requireAuth itself (middleware/auth.ts) has no dedicated test file — every
+// other suite mocks jsonwebtoken entirely and never exercises jwt.verify's
+// failure paths. GET /api/auth/me is used here purely as a stand-in for
+// "any requireAuth-protected route": these tests are about the middleware
+// short-circuiting BEFORE the route handler runs, not about /me specifically.
+describe('requireAuth middleware (exercised via GET /api/auth/me)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
+  it('rejects a request with no Authorization header at all', async () => {
+    const res = await request(app).get('/api/auth/me');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain('No token provided');
+    // Confirms the rejection happens in the middleware, before the route
+    // handler ever gets a chance to query the database.
+    expect(jwt.verify).not.toHaveBeenCalled();
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a header missing the "Bearer " prefix', async () => {
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'sometoken.without.prefix');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain('No token provided');
+    expect(jwt.verify).not.toHaveBeenCalled();
+  });
+
+  it('rejects an expired token', async () => {
+    vi.mocked(jwt.verify).mockImplementation(() => {
+      throw new Error('jwt expired');
+    });
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer an.expired.token');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain('Invalid or expired token');
+    // The DB is never touched once verification fails — a stale/expired
+    // token must not reach route logic just because it's well-formed.
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token with a tampered signature', async () => {
+    vi.mocked(jwt.verify).mockImplementation(() => {
+      throw new Error('invalid signature');
+    });
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer header.payload.wrongsignature');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain('Invalid or expired token');
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token whose payload was tampered with (fails signature check)', async () => {
+    // A tampered payload (e.g. swapping in a different userId) changes the
+    // signed content, so it fails signature verification exactly like a
+    // wrong-signature token — jwt.verify can't tell "re-signed" apart from
+    // "edited then not re-signed"; both surface as the same verify failure.
+    vi.mocked(jwt.verify).mockImplementation(() => {
+      throw new Error('invalid signature');
+    });
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer header.tamperedpayload.originalsignature');
+
+    expect(res.status).toBe(401);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  it('accepts a valid token and attaches userId for the route handler to use', async () => {
+    vi.mocked(jwt.verify).mockReturnValue({ userId: 'u1', email: 'real@quickchef.app' } as never);
+    vi.mocked(pool.query).mockResolvedValueOnce({
+      rows: [{ id: 'u1', email: 'real@quickchef.app', display_name: 'Jie', onboarding_completed: true }],
+    } as never);
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer a.valid.token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.id).toBe('u1');
+    // Confirms requireAuth passed the decoded userId through to the route,
+    // which used it as the query parameter.
+    expect(pool.query).toHaveBeenCalledWith(expect.any(String), ['u1']);
+  });
+});

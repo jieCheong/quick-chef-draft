@@ -216,7 +216,7 @@ router.post('/', validate(generateRecipeSchema), async (req: Request, res: Respo
     try {
       parsed = JSON.parse(cleaned);
     } catch {
-      console.error('Failed to parse OpenAI response:', content);
+      req.log.error({ content }, 'Failed to parse OpenAI response');
       throw new Error('AI returned invalid JSON. Please try again.');
     }
 

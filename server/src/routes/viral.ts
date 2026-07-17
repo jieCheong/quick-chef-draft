@@ -8,7 +8,7 @@ import { Router, Request, Response } from "express";
 import pool from '../db';
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response): Promise<void> => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
     try {
         const result = await pool.query(
             `SELECT
@@ -23,7 +23,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
         );
         res.json(result.rows);
     } catch (error) {
-        console.error('GET /api/viral-recipes error:', error);
+        req.log.error({ err: error }, 'GET /api/viral-recipes error');
         res.status(500).json({message: 'Failed to fetch viral recipes.'});
     }
 });

@@ -1,8 +1,11 @@
 import express, { Express } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import pinoHttp from 'pino-http';
+import swaggerUi from 'swagger-ui-express';
 import { randomUUID } from 'crypto';
 import { logger } from './logger';
+import { openApiDocument } from './openapi/document';
 
 import authRouter from './routes/auth';
 import profileRouter from './routes/profile';
@@ -15,6 +18,13 @@ import budgetRouter from './routes/budget';
 
 export function buildApp(): Express {
   const app = express();
+
+  // helmet sets the standard defensive headers (HSTS, X-Content-Type-Options,
+  // X-Frame-Options, etc.) that a "production-ready" API is expected to send
+  // by default — this is a pure API with no HTML views to render, so its
+  // CSP default (meant for pages serving their own scripts/styles) is
+  // irrelevant here and disabled to avoid interfering with responses.
+  app.use(helmet({ contentSecurityPolicy: false }));
 
   // pino-http auto-logs every request/response pair as ONE structured
   // line: method, url, statusCode, responseTime, and the genReqId below.
@@ -51,6 +61,10 @@ export function buildApp(): Express {
   // URL is generated.
   const VERCEL_PROJECT_ORIGIN = /^https:\/\/quick-chef-draft(-[a-z0-9-]+)?\.vercel\.app$/;
 
+  // credentials: true is deliberately omitted — auth here is a Bearer token
+  // in the Authorization header (see middleware/auth.ts), never a cookie, so
+  // there's nothing that needs cross-origin credential passing. Enabling it
+  // would only widen the CORS surface for no functional benefit.
   app.use(cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
@@ -63,7 +77,6 @@ export function buildApp(): Express {
         callback(new Error(`CORS blocked: ${origin}`));
       }
     },
-    credentials: true,
   }));
 
   app.use(express.json({ limit: '10mb' }));
@@ -71,6 +84,13 @@ export function buildApp(): Express {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'quickchef-api' });
   });
+
+  // Interactive API docs generated from the same Zod schemas that validate
+  // requests at runtime (src/openapi/document.ts) — the spec can't drift
+  // from what the API actually accepts, because it's built from the exact
+  // same source of truth.
+  app.get('/api/openapi.json', (_req, res) => res.json(openApiDocument));
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
   app.use('/api/auth', authRouter);
   app.use('/api/profile', profileRouter);

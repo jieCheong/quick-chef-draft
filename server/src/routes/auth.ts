@@ -15,6 +15,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../db';
 import { requireAuth } from '../middleware/auth';
 import { validate } from '../middleware/validate';
+import { authRateLimiter } from '../middleware/rateLimit';
 import { registerSchema, loginSchema, RegisterInput, LoginInput } from '../schemas/auth.schema';
 
 const router = Router();
@@ -38,7 +39,7 @@ function signToken(userId: string, email: string): string {
 //   4. INSERT new user into the users table
 //   5. Sign a JWT with the new user's id
 //   6. Return { user, token }
-router.post('/register', validate(registerSchema), async (req: Request, res: Response): Promise<void> => {
+router.post('/register', authRateLimiter, validate(registerSchema), async (req: Request, res: Response): Promise<void> => {
     const { email, password, display_name } = req.body as RegisterInput;
 
     try {
@@ -89,7 +90,7 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
             client.release();
         } 
     } catch (error) {
-        console.error('Register error: ', error);
+        req.log.error({ err: error }, 'Register error');
         res.status(500).json({message: 'Something went wrong, please try again.'});
     }
 });
@@ -99,7 +100,7 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
 //   2. Compare password with bcrypt.compare()
 //   3. If match: sign JWT and return { user, token }
 //   4. If no match: return 401 Unauthorized
-router.post('/login', validate(loginSchema), async (req: Request, res: Response): Promise<void> => {
+router.post('/login', authRateLimiter, validate(loginSchema), async (req: Request, res: Response): Promise<void> => {
     const { email, password } = req.body as LoginInput;
 
     try {
@@ -141,7 +142,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
         });
 
     } catch (error) {
-        console.error('Login error:', error);
+        req.log.error({ err: error }, 'Login error');
         res.status(500).json({message: 'Something went wrong, please try again.'});
     }
 });
@@ -179,7 +180,7 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
             }
         });
     } catch (error) {
-        console.error('Error:', error);
+        req.log.error({ err: error }, 'GET /api/auth/me error');
         res.status(500).json({message: 'Something went wrong.'});
     }
 });

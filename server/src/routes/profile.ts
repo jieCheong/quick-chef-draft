@@ -41,7 +41,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
         }
         res.json({profile: result.rows[0]});
     } catch(error) {
-        console.error('GET /api/profile error:', error);
+        req.log.error({ err: error }, 'GET /api/profile error');
         res.status(500).json({message: 'Failed to fetch profile.'});
     }
 });
@@ -90,7 +90,7 @@ Promise<void> => {
         }
         res.json({profile: result.rows[0]});
     } catch(error) {
-        console.error('PATH /api/profile error:', error);
+        req.log.error({ err: error }, 'PATCH /api/profile error');
         res.status(500).json({message: 'Failed to update profile.'});
     }
 });

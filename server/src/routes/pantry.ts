@@ -23,7 +23,7 @@ router.get('/', async(req: Request, res: Response): Promise<void> => {
         );
         res.json(result.rows);
     } catch (error) {
-        console.error('GET /api/pantry error:', error);
+        req.log.error({ err: error }, 'GET /api/pantry error');
         res.status(500).json({message: 'Failed to fetch pantry items.'});
     }
 });
@@ -52,7 +52,7 @@ router.post('/', validate(addPantryItemSchema), async (req: Request, res: Respon
         );
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        console.error('POST /api/pantry error:', error);
+        req.log.error({ err: error }, 'POST /api/pantry error');
         res.status(500).json({message: 'Failed to add pantry item.'});
     }
 });
@@ -74,7 +74,7 @@ router.delete('/:id', validate(idParamSchema, 'params'), async (req: Request, re
         }
         res.status(204).send();
     } catch (error) {
-        console.error('DELETE /api/pantry/:id error:', error);
+        req.log.error({ err: error }, 'DELETE /api/pantry/:id error');
         res.status(500).json({message: 'Failed to remove pantry item.'});
     }
 });

@@ -18,7 +18,7 @@ router.get('/', async(req: Request, res: Response): Promise<void> => {
             const result = await pool.query(query, params);  
             res.json(result.rows);
     } catch (error) {
-        console.error('GET /api/recipes error:', error);
+        req.log.error({ err: error }, 'GET /api/recipes error');
         res.status(500).json({message: 'Failed to fetch saved recipes.'});
     }
 });
@@ -76,7 +76,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         );
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        console.error('POST /api/recipes error:', error);
+        req.log.error({ err: error }, 'POST /api/recipes error');
         res.status(500).json({message: 'Failed to save recipe.'});
     }
 });
@@ -108,7 +108,7 @@ router.patch('/:id', validate(idParamSchema, 'params'), async (req: Request, res
         }
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('PATCH /api/recipes/:id error:', error);
+        req.log.error({ err: error }, 'PATCH /api/recipes/:id error');
         res.status(500).json({ message: 'Failed to update recipe.' });
     }
 });
@@ -130,7 +130,7 @@ router.delete('/:id', validate(idParamSchema, 'params'), async (req: Request, re
         }
         res.status(204).send();
     } catch (error) {
-        console.error('DELETE /api/recipes/:id error:', error);
+        req.log.error({ err: error }, 'DELETE /api/recipes/:id error');
         res.status(500).json({message: 'Failed to delete recipe.'});
     }
 });
