@@ -89,8 +89,16 @@ export function buildApp(): Express {
   // requests at runtime (src/openapi/document.ts) — the spec can't drift
   // from what the API actually accepts, because it's built from the exact
   // same source of truth.
+  //
+  // The Swagger UI is dev/staging-only — no secret data lives in it, but
+  // there's no reason to hand a free map of the API surface to anyone
+  // probing the production server. The raw spec stays public since it's
+  // the same kind of contract a REST API commonly publishes for client
+  // generation.
+  if (process.env.NODE_ENV !== 'production') {
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
+  }
   app.get('/api/openapi.json', (_req, res) => res.json(openApiDocument));
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
   app.use('/api/auth', authRouter);
   app.use('/api/profile', profileRouter);
