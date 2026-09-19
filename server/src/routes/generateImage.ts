@@ -61,7 +61,7 @@ async function releaseImageSlot(userId: string): Promise<void> {
 }
 
 function buildImagePrompt({ recipeTitle, stepInstruction }: GenerateImageInput): string {
-  return `A professional food photography shot illustrating one cooking step from the recipe "${recipeTitle}". The step: "${stepInstruction}". Bright natural lighting, overhead or close-up angle as appropriate, appetizing and realistic, no text or watermarks in the image.`;
+  return `A professional food photography shot illustrating one cooking step from the recipe "${recipeTitle}". The step: "${stepInstruction}". Bright natural lighting, a wide overhead shot with the entire pan, pot, or dish fully visible inside the frame and some counter or background showing at the edges — not a tight close-up or macro crop. Appetizing and realistic, no text or watermarks in the image.`;
 }
 
 // ─── POST /api/generate-image ──────────────────────────────────────────────

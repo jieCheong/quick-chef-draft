@@ -96,8 +96,8 @@ function RecipeDetail({ recipe, idx, onBack, onSave, saving }: {
   return (
     <MobileLayout showNav={false}>
       <div>
-        <div className="relative h-64 bg-muted">
-          <img src={img} alt={recipe.title} className="w-full h-full object-cover" />
+        <div className="relative aspect-square bg-muted">
+          <img src={img} alt={recipe.title} className="w-full h-full object-contain" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
           <div className="absolute top-14 inset-x-0 px-5 flex items-center justify-between">
             <button onClick={onBack} className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white">
@@ -171,9 +171,9 @@ function RecipeDetail({ recipe, idx, onBack, onSave, saving }: {
                       <p className="text-sm leading-relaxed pt-1">{s.instruction}</p>
                     </div>
                     {stepImg ? (
-                      <img src={stepImg} alt={`Step ${s.step}`} className="w-full h-40 object-cover rounded-xl" />
+                      <img src={stepImg} alt={`Step ${s.step}`} className="w-full aspect-square object-contain bg-muted rounded-xl" />
                     ) : generatingSteps.has(s.step) ? (
-                      <div className="w-full h-40 rounded-xl bg-secondary flex items-center justify-center">
+                      <div className="w-full aspect-square rounded-xl bg-secondary flex items-center justify-center">
                         <Loader2 size={20} className="animate-spin text-accent" />
                       </div>
                     ) : (
@@ -323,7 +323,7 @@ export default function Cook() {
               <button key={idx} onClick={() => { setSelectedRecipe(recipe); setSelectedIdx(idx); setStep('detail'); }}
                 className="w-full bg-card rounded-2xl overflow-hidden border border-border hover:border-accent/30 active:scale-[0.99] transition-all text-left">
                 <div className="h-44 bg-muted overflow-hidden">
-                  <img src={recipe.image_url || FALLBACK[idx % FALLBACK.length]} alt={recipe.title} className="w-full h-full object-cover" />
+                  <img src={recipe.image_url || FALLBACK[idx % FALLBACK.length]} alt={recipe.title} className="w-full h-full object-contain" />
                 </div>
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-1">

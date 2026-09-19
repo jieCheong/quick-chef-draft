@@ -6,7 +6,7 @@
 // the module boundary (pg Pool, bcryptjs, jsonwebtoken).
 //
 // WHY MOCK bcrypt INSTEAD OF LETTING IT RUN FOR REAL:
-// bcrypt.hash with 10 salt rounds takes roughly 80-100ms BY DESIGN —
+// bcrypt.hash with 12 salt rounds takes roughly 225ms BY DESIGN —
 // that deliberate slowness is what makes it resistant to brute force.
 // That's exactly the property we don't want paying for in a test suite
 // that should run in milliseconds. Mocking bcrypt.hash/.compare to

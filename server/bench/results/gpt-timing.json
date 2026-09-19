@@ -1,0 +1,194 @@
+{
+  "model": "gpt-4o-mini",
+  "n": 20,
+  "rows": [
+    {
+      "i": 1,
+      "ms": 13061.080600000001,
+      "promptTokens": 348,
+      "completionTokens": 1181,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 2,
+      "ms": 11856.121099999998,
+      "promptTokens": 357,
+      "completionTokens": 1196,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 3,
+      "ms": 12468.740500000004,
+      "promptTokens": 345,
+      "completionTokens": 1239,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 4,
+      "ms": 13036.911099999998,
+      "promptTokens": 352,
+      "completionTokens": 1446,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 5,
+      "ms": 44609.4256,
+      "promptTokens": 368,
+      "completionTokens": 1470,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 6,
+      "ms": 12316.360700000005,
+      "promptTokens": 348,
+      "completionTokens": 1176,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 7,
+      "ms": 10145.380000000005,
+      "promptTokens": 357,
+      "completionTokens": 1162,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 8,
+      "ms": 34713.36839999999,
+      "promptTokens": 345,
+      "completionTokens": 1318,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 9,
+      "ms": 12853.206000000006,
+      "promptTokens": 352,
+      "completionTokens": 1489,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 10,
+      "ms": 9272.721900000004,
+      "promptTokens": 368,
+      "completionTokens": 1512,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 11,
+      "ms": 13213.167600000015,
+      "promptTokens": 348,
+      "completionTokens": 1181,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 12,
+      "ms": 13091.21040000001,
+      "promptTokens": 357,
+      "completionTokens": 1264,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 13,
+      "ms": 10561.983600000007,
+      "promptTokens": 345,
+      "completionTokens": 1230,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 14,
+      "ms": 15030.430300000007,
+      "promptTokens": 352,
+      "completionTokens": 1580,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 15,
+      "ms": 9886.765699999989,
+      "promptTokens": 368,
+      "completionTokens": 1502,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 16,
+      "ms": 32423.517999999982,
+      "promptTokens": 348,
+      "completionTokens": 1189,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 17,
+      "ms": 10487.38559999998,
+      "promptTokens": 357,
+      "completionTokens": 1304,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 18,
+      "ms": 15395.710599999991,
+      "promptTokens": 345,
+      "completionTokens": 1279,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 19,
+      "ms": 10882.167799999996,
+      "promptTokens": 352,
+      "completionTokens": 1168,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    },
+    {
+      "i": 20,
+      "ms": 14915.6728,
+      "promptTokens": 368,
+      "completionTokens": 1316,
+      "finish": "stop",
+      "validJson": true,
+      "recipes": 3
+    }
+  ],
+  "latencySeconds": {
+    "n": 20,
+    "min": 9.272721900000004,
+    "median": 13.036911099999998,
+    "p95": 44.6094256,
+    "max": 44.6094256,
+    "mean": 16.011066415000002
+  }
+}

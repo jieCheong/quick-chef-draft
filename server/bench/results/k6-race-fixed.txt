@@ -1,0 +1,108 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: load-test/rate-limit-race.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 1 max VUs, 2m30s max duration (incl. graceful stop):
+              * race: 1 iterations shared among 1 VUs (maxDuration: 2m0s, gracefulStop: 30s)
+
+time="2026-09-18T23:06:03-05:00" level=info msg="register: HTTP 201 in 309 ms" source=console
+
+running (0m01.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m00.7s/2m0s  0/1 shared iters
+
+running (0m02.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m01.7s/2m0s  0/1 shared iters
+
+running (0m03.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m02.7s/2m0s  0/1 shared iters
+
+running (0m04.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m03.7s/2m0s  0/1 shared iters
+
+running (0m05.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m04.7s/2m0s  0/1 shared iters
+
+running (0m06.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m05.7s/2m0s  0/1 shared iters
+
+running (0m07.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m06.7s/2m0s  0/1 shared iters
+
+running (0m08.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m07.7s/2m0s  0/1 shared iters
+
+running (0m09.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m08.7s/2m0s  0/1 shared iters
+
+running (0m10.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m09.7s/2m0s  0/1 shared iters
+
+running (0m11.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m10.7s/2m0s  0/1 shared iters
+
+running (0m12.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m11.7s/2m0s  0/1 shared iters
+
+running (0m13.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m12.7s/2m0s  0/1 shared iters
+
+running (0m14.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+race   [   0% ] 1 VUs  0m13.7s/2m0s  0/1 shared iters
+time="2026-09-18T23:06:17-05:00" level=info msg="10 concurrent requests -> 2 x 200, 8 x 429 (daily cap), 0 other" source=console
+
+
+  █ THRESHOLDS 
+
+    race_status_200
+    ✓ 'count==2' count=2
+
+    race_status_429_daily_cap
+    ✓ 'count==8' count=8
+
+    race_status_other
+    ✓ 'count==0' count=0
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 2       0.141578/s
+    checks_succeeded...: 100.00% 2 out of 2
+    checks_failed......: 0.00%   0 out of 2
+
+    ✓ exactly 2 requests passed the cap gate
+    ✓ exactly 8 were rejected by the cap
+
+    CUSTOM
+    race_status_200................: 2      0.141578/s
+    race_status_429_daily_cap......: 8      0.566312/s
+    race_status_other..............: 0      0/s
+
+    HTTP
+    http_req_duration..............: avg=2.49s  min=58.59ms  med=101.43ms max=13.77s p(90)=12.67s p(95)=13.22s
+      { expected_response:true }...: avg=8.91s  min=284.74ms med=12.67s   max=13.77s p(90)=13.55s p(95)=13.66s
+    http_req_failed................: 72.72% 8 out of 11
+    http_reqs......................: 11     0.778679/s
+
+    EXECUTION
+    iteration_duration.............: avg=13.81s min=13.81s   med=13.81s   max=13.81s p(90)=13.81s p(95)=13.81s
+    iterations.....................: 1      0.070789/s
+    vus............................: 1      min=1       max=1
+    vus_max........................: 1      min=1       max=1
+
+    NETWORK
+    data_received..................: 16 kB  1.1 kB/s
+    data_sent......................: 5.8 kB 407 B/s
+
+
+
+
+running (0m14.1s), 0/1 VUs, 1 complete and 0 interrupted iterations
+race ✓ [ 100% ] 1 VUs  0m13.8s/2m0s  1/1 shared iters

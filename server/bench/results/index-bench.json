@@ -1,0 +1,203 @@
+{
+  "rows": 5088,
+  "users": 45,
+  "rounds": 3,
+  "runsPerRound": 100,
+  "indexBytes": {
+    "A": 0,
+    "B": 57344,
+    "C": 229376
+  },
+  "results": {
+    "list": {
+      "A": {
+        "exec": {
+          "n": 300,
+          "min": 0.593,
+          "median": 0.8,
+          "p95": 1.553,
+          "max": 3.332,
+          "mean": 0.8937866666666672
+        },
+        "plan": {
+          "n": 300,
+          "min": 0.035,
+          "median": 0.049,
+          "p95": 0.099,
+          "max": 0.179,
+          "mean": 0.055400000000000026
+        },
+        "client": {
+          "n": 300,
+          "min": 1.5659999999999172,
+          "median": 2.1831999999994878,
+          "p95": 4.034999999999968,
+          "max": 6.879000000000019,
+          "mean": 2.3964723333333544
+        },
+        "avgBuffers": 1193,
+        "topShape": "Sort > Seq Scan",
+        "topShapeShare": 1
+      },
+      "B": {
+        "exec": {
+          "n": 300,
+          "min": 0.087,
+          "median": 0.125,
+          "p95": 0.179,
+          "max": 0.299,
+          "mean": 0.12878999999999996
+        },
+        "plan": {
+          "n": 300,
+          "min": 0.03,
+          "median": 0.042,
+          "p95": 0.068,
+          "max": 0.105,
+          "mean": 0.04517000000000001
+        },
+        "client": {
+          "n": 300,
+          "min": 0.9525999999996202,
+          "median": 1.4036000000000968,
+          "p95": 2.2806000000000495,
+          "max": 9.411299999999756,
+          "mean": 1.500562999999983
+        },
+        "avgBuffers": 39.19,
+        "topShape": "Sort > Bitmap Heap Scan > Bitmap Index Scan(idx_saved_recipes_user_id)",
+        "topShapeShare": 1
+      },
+      "C": {
+        "exec": {
+          "n": 300,
+          "min": 0.086,
+          "median": 0.129,
+          "p95": 0.193,
+          "max": 0.485,
+          "mean": 0.13502999999999993
+        },
+        "plan": {
+          "n": 300,
+          "min": 0.031,
+          "median": 0.04,
+          "p95": 0.077,
+          "max": 0.136,
+          "mean": 0.04529666666666668
+        },
+        "client": {
+          "n": 300,
+          "min": 0.9147000000002663,
+          "median": 1.3987999999999374,
+          "p95": 2.3121000000001004,
+          "max": 6.131200000000035,
+          "mean": 1.4913480000000239
+        },
+        "avgBuffers": 39.35,
+        "topShape": "Sort > Bitmap Heap Scan > Bitmap Index Scan(idx_saved_recipes_user_created)",
+        "topShapeShare": 1
+      },
+      "improvement": {
+        "B_to_C_exec_pct": -3.2,
+        "B_to_C_client_pct": 0.3,
+        "A_to_B_exec_pct": 84.4,
+        "A_to_C_exec_pct": 83.9
+      }
+    },
+    "limit3": {
+      "A": {
+        "exec": {
+          "n": 300,
+          "min": 0.451,
+          "median": 0.619,
+          "p95": 0.94,
+          "max": 1.729,
+          "mean": 0.6518066666666669
+        },
+        "plan": {
+          "n": 300,
+          "min": 0.027,
+          "median": 0.037,
+          "p95": 0.069,
+          "max": 0.174,
+          "mean": 0.042146666666666645
+        },
+        "client": {
+          "n": 300,
+          "min": 1.069300000000112,
+          "median": 1.3915999999999258,
+          "p95": 2.1304000000000087,
+          "max": 2.9812000000001717,
+          "mean": 1.474665333333306
+        },
+        "avgBuffers": 1193,
+        "topShape": "Limit > Sort > Seq Scan",
+        "topShapeShare": 1
+      },
+      "B": {
+        "exec": {
+          "n": 300,
+          "min": 0.07,
+          "median": 0.094,
+          "p95": 0.124,
+          "max": 0.189,
+          "mean": 0.09589000000000006
+        },
+        "plan": {
+          "n": 300,
+          "min": 0.029,
+          "median": 0.034,
+          "p95": 0.052,
+          "max": 0.112,
+          "mean": 0.03655999999999991
+        },
+        "client": {
+          "n": 300,
+          "min": 0.5302000000001499,
+          "median": 0.69399999999996,
+          "p95": 1.0303000000003522,
+          "max": 1.6029000000000906,
+          "mean": 0.7342073333333307
+        },
+        "avgBuffers": 39.19,
+        "topShape": "Limit > Sort > Bitmap Heap Scan > Bitmap Index Scan(idx_saved_recipes_user_id)",
+        "topShapeShare": 1
+      },
+      "C": {
+        "exec": {
+          "n": 300,
+          "min": 0.026,
+          "median": 0.032,
+          "p95": 0.063,
+          "max": 0.138,
+          "mean": 0.03586333333333332
+        },
+        "plan": {
+          "n": 300,
+          "min": 0.028,
+          "median": 0.034,
+          "p95": 0.07,
+          "max": 0.125,
+          "mean": 0.03872666666666664
+        },
+        "client": {
+          "n": 300,
+          "min": 0.4275000000006912,
+          "median": 0.6516000000001441,
+          "p95": 1.1606000000001586,
+          "max": 1.6715999999996711,
+          "mean": 0.7005633333333564
+        },
+        "avgBuffers": 5,
+        "topShape": "Limit > Index Scan(idx_saved_recipes_user_created)",
+        "topShapeShare": 1
+      },
+      "improvement": {
+        "B_to_C_exec_pct": 66,
+        "B_to_C_client_pct": 6.1,
+        "A_to_B_exec_pct": 84.8,
+        "A_to_C_exec_pct": 94.8
+      }
+    }
+  }
+}

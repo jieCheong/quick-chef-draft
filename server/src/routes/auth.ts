@@ -20,6 +20,12 @@ import { registerSchema, loginSchema, RegisterInput, LoginInput } from '../schem
 
 const router = Router();
 
+// bcrypt work factor. Each +1 doubles the hashing time: measured with bcryptjs
+// (pure JS) at ~56ms for 10, ~113ms for 11, ~225ms for 12 (bench/auth-timing.js).
+// The cost is stored inside every hash, so bcrypt.compare keeps working on
+// existing cost-10 hashes — only newly registered passwords use this value.
+const BCRYPT_COST = 12;
+
 // Helper - sign a jwt
 // jwt.sign() takes: payload, secret, and options
 // '7d' => after 7 days the user must log in again
@@ -52,7 +58,7 @@ router.post('/register', authRateLimiter, validate(registerSchema), async (req: 
             return;
         }
         // hash the password
-        const password_hash = await bcrypt.hash(password, 10);
+        const password_hash = await bcrypt.hash(password, BCRYPT_COST);
         // insert user + profile in a transaction
         const client = await pool.connect();
 

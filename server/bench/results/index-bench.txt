@@ -1,0 +1,22 @@
+saved_recipes rows: 5088; sampling 45 users; 3 rounds x 100 runs per state/variant
+
+=== LIST  (SELECT * FROM saved_recipes WHERE user_id=$1 ORDER BY created_at DESC) ===
+state |   n | exec median | exec p95 | plan median | client median | client p95 | avg buffers | index size
+  A   | 300 |    0.800 ms | 1.553 ms |  0.049 ms  |    2.183 ms  |  4.035 ms |     1193.0  | 0 kB
+  B   | 300 |    0.125 ms | 0.179 ms |  0.042 ms  |    1.404 ms  |  2.281 ms |       39.2  | 56 kB
+  C   | 300 |    0.129 ms | 0.193 ms |  0.040 ms  |    1.399 ms  |  2.312 ms |       39.4  | 224 kB
+  plan A: Sort > Seq Scan  (100% of runs)
+  plan B: Sort > Bitmap Heap Scan > Bitmap Index Scan(idx_saved_recipes_user_id)  (100% of runs)
+  plan C: Sort > Bitmap Heap Scan > Bitmap Index Scan(idx_saved_recipes_user_created)  (100% of runs)
+  >> B->C: exec -3.2%  client 0.3%   (context: A->B 84.4%, A->C 83.9%)
+
+=== LIMIT3  (SELECT * FROM saved_recipes WHERE user_id=$1 ORDER BY created_at DESC LIMIT 3) ===
+state |   n | exec median | exec p95 | plan median | client median | client p95 | avg buffers | index size
+  A   | 300 |    0.619 ms | 0.940 ms |  0.037 ms  |    1.392 ms  |  2.130 ms |     1193.0  | 0 kB
+  B   | 300 |    0.094 ms | 0.124 ms |  0.034 ms  |    0.694 ms  |  1.030 ms |       39.2  | 56 kB
+  C   | 300 |    0.032 ms | 0.063 ms |  0.034 ms  |    0.652 ms  |  1.161 ms |        5.0  | 224 kB
+  plan A: Limit > Sort > Seq Scan  (100% of runs)
+  plan B: Limit > Sort > Bitmap Heap Scan > Bitmap Index Scan(idx_saved_recipes_user_id)  (100% of runs)
+  plan C: Limit > Index Scan(idx_saved_recipes_user_created)  (100% of runs)
+  >> B->C: exec 66%  client 6.1%   (context: A->B 84.8%, A->C 94.8%)
+

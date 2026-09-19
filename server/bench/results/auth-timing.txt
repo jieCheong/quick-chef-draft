@@ -1,0 +1,7 @@
+jwt.verify (HS256)                 n= 5000  median 0.024 ms   p95 0.047 ms   mean 0.031 ms
+bcryptjs.hash    cost 10 (current) n=   20  median 57.286 ms   p95 72.987 ms   mean 58.611 ms
+bcryptjs.compare cost 10 (current) n=   20  median 59.535 ms   p95 76.668 ms   mean 60.608 ms
+bcryptjs.hash    cost 11           n=   20  median 114.324 ms   p95 149.327 ms   mean 118.329 ms
+bcryptjs.compare cost 11           n=   20  median 110.853 ms   p95 144.536 ms   mean 115.410 ms
+bcryptjs.hash    cost 12           n=   20  median 236.925 ms   p95 274.030 ms   mean 236.578 ms
+bcryptjs.compare cost 12           n=   20  median 241.906 ms   p95 270.617 ms   mean 238.493 ms

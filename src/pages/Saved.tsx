@@ -119,8 +119,8 @@ function SavedRecipeDetail({ recipe, idx, onBack, onDelete, onInstructionsUpdate
   return (
     <MobileLayout showNav={false}>
       <div>
-        <div className="relative h-64 bg-muted">
-          <img src={img} alt={recipe.title} className="w-full h-full object-cover" />
+        <div className="relative aspect-square bg-muted">
+          <img src={img} alt={recipe.title} className="w-full h-full object-contain" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
           <div className="absolute top-14 inset-x-0 px-5 flex items-center justify-between">
             <button onClick={onBack} className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white">
@@ -190,9 +190,9 @@ function SavedRecipeDetail({ recipe, idx, onBack, onDelete, onInstructionsUpdate
                     <p className="text-sm leading-relaxed pt-1">{s.instruction}</p>
                   </div>
                   {s.image_url ? (
-                    <img src={s.image_url} alt={`Step ${s.step}`} className="w-full h-40 object-cover rounded-xl" />
+                    <img src={s.image_url} alt={`Step ${s.step}`} className="w-full aspect-square object-contain bg-muted rounded-xl" />
                   ) : generatingSteps.has(s.step) ? (
-                    <div className="w-full h-40 rounded-xl bg-secondary flex items-center justify-center">
+                    <div className="w-full aspect-square rounded-xl bg-secondary flex items-center justify-center">
                       <Loader2 size={20} className="animate-spin text-accent" />
                     </div>
                   ) : (
@@ -299,7 +299,7 @@ export default function SavedRecipes() {
                   <img
                     src={recipe.image_url || FALLBACK[idx % FALLBACK.length]}
                     alt={recipe.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <div className="flex-1 p-4">

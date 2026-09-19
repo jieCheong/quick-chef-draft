@@ -1,0 +1,6 @@
+10 concurrent requests vs. a 2/day cap, one user
+
+variant                          trials | requests past the cap gate: min / median / max | trials over cap | final generations_used (max)
+OLD  check-then-increment, 0ms       50   |            4 / 10 / 10                      |   50 / 50       | 10
+OLD  check-then-increment, 500ms     30   |            10 / 10 / 10                      |   30 / 30       | 10
+NEW  atomic upsert                 200   |            2 / 2 / 2                      |    0 / 200       | 2

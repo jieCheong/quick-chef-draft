@@ -89,7 +89,7 @@ async function generateThreeViralRecipes(): Promise<ViralRecipeDraft[]> {
 // with image_url null just falls back to a generic stock photo on the
 // frontend, which is a downgrade, not a dealbreaker.
 async function generateHeroImage(recipe: ViralRecipeDraft): Promise<string | null> {
-  const prompt = `A professional food photography hero shot of "${recipe.title}". ${recipe.description} Bright natural lighting, overhead or 45-degree angle, appetizing and realistic, no text or watermarks in the image.`;
+  const prompt = `A professional food photography hero shot of "${recipe.title}". ${recipe.description} Bright natural lighting, overhead or 45-degree angle, the entire plated dish fully visible inside the frame with room around it — not a tight close-up or macro crop. Appetizing and realistic, no text or watermarks in the image.`;
   try {
     return await generateFoodImage(prompt);
   } catch (error) {
